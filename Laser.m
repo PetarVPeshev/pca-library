@@ -3,24 +3,24 @@ classdef Laser < handle
     %   Detailed explanation goes here
     
     properties (SetAccess = immutable)
-        wlen (1,1) double
-        freq (1,1) double
-        radius_half_width (1,1) double
-        pulse_half_pwr (1,1) double
+        wlen                (1,1) double
+        freq                (1,1) double
+        radius_half_width   (1,1) double
+        pulse_half_pwr      (1,1) double
     end
 
     properties
-        rep_period (1,1) double
-        avg_pwr (1,1) double
+        rep_period  (1,1) double
+        avg_pwr     (1,1) double
     end
 
     properties (Dependent, SetAccess = protected)
-        spatial_std (1,1) double
-        temporal_std (1,1) double
-        peak_pwr (1,1) double
-        peak_pwr_dens (1,1) double
-        pulse_energy (1,1) double
-        peak_e_field (1,1) double
+        spatial_std     (1,1) double
+        temporal_std    (1,1) double
+        peak_pwr        (1,1) double
+        peak_pwr_dens   (1,1) double
+        pulse_energy    (1,1) double
+        peak_e_field    (1,1) double
     end
     
     methods
@@ -33,11 +33,11 @@ classdef Laser < handle
             %   pulse_half_pwr [\tau_{p}] temporal half-power pulse width (FWHM) [s]
 
             arguments
-                laser_wlen (1,1) double {mustBePositive, mustBeReal}
-                rep_period (1,1) double {mustBePositive, mustBeReal}
-                laser_avg_pwr (1,1) double {mustBePositive, mustBeReal}
-                beam_distrib.radius_half_width (1,1) double {mustBePositive, mustBeReal}
-                beam_distrib.pulse_half_pwr (1,1) double {mustBePositive, mustBeReal}
+                laser_wlen                      (1,1) double {mustBePositive, mustBeReal}
+                rep_period                      (1,1) double {mustBePositive, mustBeReal}
+                laser_avg_pwr                   (1,1) double {mustBePositive, mustBeReal}
+                beam_distrib.radius_half_width  (1,1) double {mustBePositive, mustBeReal}
+                beam_distrib.pulse_half_pwr     (1,1) double {mustBePositive, mustBeReal}
             end
             
             obj.wlen = laser_wlen;
@@ -87,8 +87,7 @@ classdef Laser < handle
         function peak_pwr = get.peak_pwr(obj)
             %GET.TEMPORAL_STD Summary of this method goes here
             
-            peak_pwr = obj.avg_pwr * obj.rep_period ...
-                / ( obj.temporal_std * sqrt(2 * pi) );
+            peak_pwr = obj.avg_pwr * obj.rep_period / ( obj.temporal_std * sqrt(2 * pi) );
         end
 
         function peak_pwr_dens = get.peak_pwr_dens(obj)
@@ -106,8 +105,7 @@ classdef Laser < handle
         function peak_e_field = get.peak_e_field(obj)
             %GET.PEAK_E_FIELD Summary of this method goes here
             
-            peak_e_field = sqrt( 2 * obj.peak_pwr_dens ...
-                * get_phys_const("VacuumImpedance") );
+            peak_e_field = sqrt( 2 * obj.peak_pwr_dens * get_phys_const("VacuumImpedance") );
         end
 
         function time_vec = get_time_vec(obj, delta_t, time_limits)
@@ -117,9 +115,9 @@ classdef Laser < handle
 
             arguments
                 obj
-                delta_t (1,1) {mustBePositive, mustBeReal}
-                time_limits.min_t (1,1) {mustBeNonpositive, mustBeReal} = 0
-                time_limits.max_t (1,1) {mustBeNonnegative, mustBeReal} = 0
+                delta_t             (1,1) {mustBePositive, mustBeReal}
+                time_limits.min_t   (1,1) {mustBeNonpositive, mustBeReal} = 0
+                time_limits.max_t   (1,1) {mustBeNonnegative, mustBeReal} = 0
             end
 
             if time_limits.min_t == 0
@@ -145,13 +143,13 @@ classdef Laser < handle
 
             arguments
                 obj
-                delta_t (1,1) {mustBePositive, mustBeReal}
-                max_t (1,1) {mustBePositive, mustBeReal} = 5 * obj.pulse_half_pwr
-                options.z (1,1) {mustBeReal} = 0
-                options.line_style (1,:) {mustBeMember(options.line_style, {'-', '--', ':', '-.'})} = '-'
-                options.line_width (1,1) {mustBePositive, mustBeReal} = 1.5
-                options.display_name (1,:) {mustBeText} = 'time envelope'
-                options.time_scale (1,:) {mustBeMember(options.time_scale, {'ns', 'ps', 'fs'})} = 'ps'
+                delta_t                 (1,1) {mustBePositive, mustBeReal}
+                max_t                   (1,1) {mustBePositive, mustBeReal} = 5 * obj.pulse_half_pwr
+                options.z               (1,1) {mustBeReal} = 0
+                options.line_style      (1,:) {mustBeMember(options.line_style, {'-', '--', ':', '-.'})} = '-'
+                options.line_width      (1,1) {mustBePositive, mustBeReal} = 1.5
+                options.display_name    (1,:) {mustBeText} = 'time envelope'
+                options.time_scale      (1,:) {mustBeMember(options.time_scale, {'ns', 'ps', 'fs'})} = 'ps'
             end
 
             c = get_phys_const('LightSpeed');
@@ -166,22 +164,18 @@ classdef Laser < handle
             time_vec = obj.get_time_vec(delta_t, max_t = max_t);
             temporal_envelope = zeros(1, length(time_vec));
             for rep_idx = 0 : 1 : floor(max_t / obj.rep_period)
-                temporal_envelope = temporal_envelope + exp(- 0.5 ...
-                    * ( (time_vec - obj.rep_period * rep_idx ...
+                temporal_envelope = temporal_envelope + exp(- 0.5 * ( (time_vec - obj.rep_period * rep_idx ...
                     - options.z / c) / obj.temporal_std ) .^ 2);
             end
 
             fig = figure();
-            plot(time_vec * time_scale_order, temporal_envelope, ...
-                options.line_style, 'LineWidth', options.line_width, ...
-                'DisplayName', options.display_name);
+            plot(time_vec * time_scale_order, temporal_envelope, options.line_style, ...
+                'LineWidth', options.line_width, 'DisplayName', options.display_name);
             grid on;
             xlabel(['t / ' options.time_scale]);
             ylabel('P(t) / P_{0}');
-            title(['Laser Temporal Envelope @ \tau_{p} = ' ...
-                num2str(obj.pulse_half_pwr * time_scale_order) ' ' ...
-                options.time_scale ', T_{p} = ' ...
-                num2str(obj.rep_period * 1e9) ' ns']);
+            title(['Laser Temporal Envelope @ \tau_{p} = ' num2str(obj.pulse_half_pwr * time_scale_order) ...
+                ' ' options.time_scale ', T_{p} = ' num2str(obj.rep_period * 1e9) ' ns']);
         end
     end
 end
