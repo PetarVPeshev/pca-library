@@ -17,16 +17,7 @@ function [v, i_impr] = do_time_step(t, v, vb, k, sigma_t, tau_rec, tau_s)
     fm_impr = NaN(1, m);
     for n = 1 : 1 : m
         fm_impr(n) = sum( exp(- (t(m) - t(n : m)) / tau_s) );
-%         hm(n) = exp(- 0.5 * (t(n) / sigma_t) .^ 2) .* exp(- (t(m) - t(n)) / tau_rec) * k * dt ^ 2;
-
-%         fm_impr = NaN(1, m - n + 1);
-%         for q = n : 1 : m
-%             fm_impr(q) = exp(- (t(m) - t(q)) / tau_s);
-%         end
-
-%         Fm_impr(n) = hm(n) * sum(fm_impr);
     end
-%     hm = exp(- 0.5 * (t(1 : m) / sigma_t) .^ 2) .* exp(- (t(m) - t(1 : m)) / tau_rec) * k * dt ^ 2;
 
     F_impr = sum( (k * dt ^ 2) * exp(- 0.5 * (t(1 : m) / sigma_t) .^ 2) ...
         .* exp(- (t(m) - t(1 : m)) / tau_rec) .* fm_impr );
