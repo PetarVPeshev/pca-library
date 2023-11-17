@@ -20,6 +20,19 @@ classdef TimeStepAlgorithm < handle
             obj.time_vec = time_vec;
             obj.delta_t = time_vec(2) - time_vec(1);
         end
+
+%         function hm = compute_hm(k, sigma_t, tau_rec, options)
+%             %COMPUTE_HM Summary of this function goes here
+% 
+%             arguments
+%                 k           (1,1) double {mustBePositive}
+%                 sigma_t     (1,1) double {mustBePositive}
+%                 tau_rec     (1,1) double {mustBePositive}
+%                 options.m   (1,1) double {mustBeInteger} = 0
+%             end
+% 
+%             hm = exp(- 0.5 () ^ .2)
+%         end
         
         function time_vec = get_time_vect(obj, laser)
             %METHOD1 Summary of this method goes here
