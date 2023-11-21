@@ -2,22 +2,26 @@ close all;
 clear;
 clc;
 
-[laser, photoconductor] = get_default_config();
+[laser, GaAs] = get_default_config();
 march_on = TimeStepAlgorithm(laser.get_t_vec(laser.tau_p / 100));
-laser.plot_time_envelope();
+[~] = laser.plot_time_envelope();
 % eff = Efficiency(laser, photoconductor, eff_opt = 0.35);
 
-antenna = PhotoConductiveAntenna(laser, photoconductor, march_on, eff_opt = 0.35);
+antenna = PhotoConductiveAntenna(laser, GaAs, march_on, eff_opt = 0.35);
 
 
 %% PARAMETERS
-dt = laser.pulse_half_pwr / 1000;
-t_vec = laser.get_time_vec(dt, max_t = 15 * laser.pulse_half_pwr);
-k = antenna.k_const;
-sigma_t = laser.temporal_std;
-tau_rec = photoconductor.rec_time;
-tau_s = photoconductor.scat_time;
+% LASER
+sigma_t = laser.sigma_t;
+% PHOTOCONDUCTOR
+tau_rec = GaAs.tau_rec;
+tau_s = GaAs.tau_s;
+% ANTENNA
 Vb = 30;
+k = antenna.k_const;
+% SIMULATION
+dt = laser.tau_p / 1000;
+t_vec = laser.get_t_vec(dt);
 
 %% h_{m}
 % v = NaN(1, length(t_vec));
