@@ -36,6 +36,9 @@ classdef PhotoConductor < handle
                 coeffs.me_coef          (1,1) double {mustBePositive, mustBeReal}
                 coeffs.absorp_len       (1,1) double {mustBePositive, mustBeReal}
             end
+            
+            % TODO: Find better solution to adding the utility path in every class.
+            addpath([pwd() '\utils']);
 
             obj.dimensions.Wx = dimensions(1);
             obj.dimensions.Wy = dimensions(2);

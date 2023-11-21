@@ -40,10 +40,15 @@ classdef Laser < handle
                 beam_distrib.tau_p      (1,1) double {mustBePositive, mustBeReal}
             end
             
+            % TODO: Find better solution to adding the utility path in every class.
+            addpath([pwd() '\utils']);
+            
             obj.wlen = wlen;
             obj.freq = get_phys_const('LightSpeed') / wlen;
+
             obj.T = rep_period;
             obj.P = pwr_avg;
+
             obj.R_3db = beam_distrib.R_3db;
             obj.tau_p = beam_distrib.tau_p;
         end
@@ -171,7 +176,6 @@ classdef Laser < handle
                 t_envelop = t_envelop + exp(- 0.5 * (t_param / obj.sigma_t) .^ 2);
             end
             
-            addpath([pwd() '\utils']);
             [tau_p_magn, tau_p_magn_order] = find_magnitude(obj.tau_p);
             [T_magn, T_magn_order] = find_magnitude(obj.T);
 

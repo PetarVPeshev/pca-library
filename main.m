@@ -2,6 +2,8 @@ close all;
 clear;
 clc;
 
+addpath([pwd() '\utils']);
+
 [laser, GaAs] = get_default_config();
 [~] = laser.plot_time_envelope();
 
@@ -9,7 +11,6 @@ qo_link = QuasiOpticalLink(laser, GaAs, eta_opt = 0.35);
 
 march_on = TimeStepAlgorithm(laser.get_t_vec(laser.tau_p / 100));
 % antenna = PhotoConductiveAntenna(laser, GaAs, march_on, eff_opt = 0.35);
-
 
 %% PARAMETERS
 % LASER
