@@ -73,40 +73,6 @@ classdef PhotoConductor < handle
 
             V = obj.dimensions.Wx * obj.dimensions.Wy * obj.dimensions.Wz;
         end
-
-        function R = compute_reflectance(obj, options)
-            %COMPUTE_REFLECTANCE Summary of this method goes here
-            %   theta_inc [\theta_{inc}] Incidence angle of laser beam at interface [deg]
-            %   er_inc [\epsilon_{r,inc}] Relative permittivity of medium one (incidence medium) [-]
-
-            arguments
-                obj
-                options.theta_inc   (1,1) double {mustBeInRange(options.theta_inc, 0, 90)} = 0
-                options.er_inc      (1,1) double {mustBeGreaterThanOrEqual(options.er_inc, 1), mustBeReal} = 1
-            end
-
-            assert(options.theta_inc == 0, 'Non-normal incidence is not implemented.');
-
-            n_inc = sqrt(options.er_inc);
-            n_pc  = sqrt(obj.er);
-
-            R = abs( (n_inc - n_pc) / (n_inc + n_pc) ) ^ 2;
-        end
-
-        function T = compute_transmittance(obj, options)
-            %COMPUTE_TRANSMITTANCE Summary of this method goes here
-            %   theta_inc [\theta_{inc}] Incidence angle of laser beam at interface [deg]
-            %   er_inc [\epsilon_{r,inc}] Relative permittivity of medium one (incidence medium) [-]
-
-            arguments
-                obj
-                options.theta_inc   (1,1) double {mustBeInRange(options.theta_inc, 0, 90)} = 0
-                options.er_inc      (1,1) double {mustBeGreaterThanOrEqual(options.er_inc, 1), mustBeReal} = 1
-            end
-
-            R = obj.compute_reflectance(theta_inc = options.theta_inc, er_inc = options.er_inc);
-            T = 1 - R;
-        end
     end
 end
 
