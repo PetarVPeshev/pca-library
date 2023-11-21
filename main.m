@@ -1,10 +1,10 @@
-% close all;
+close all;
 clear;
 clc;
 
 [laser, photoconductor] = get_default_config();
-march_on = TimeStepAlgorithm(laser.get_time_vec(laser.pulse_half_pwr / 100));
-% laser.plot_time_envelope(laser.pulse_half_pwr / 100);
+march_on = TimeStepAlgorithm(laser.get_t_vec(laser.tau_p / 100));
+laser.plot_time_envelope();
 % eff = Efficiency(laser, photoconductor, eff_opt = 0.35);
 
 antenna = PhotoConductiveAntenna(laser, photoconductor, march_on, eff_opt = 0.35);
