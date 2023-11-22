@@ -2,12 +2,14 @@ close all;
 clear;
 clc;
 
+addpath([pwd() '/utils']);
+
 %% PARAMETERS
 % LASER
 tau_p   = 100 * 1e-15;  % Pulse FWHM
 T       = 12.5 * 1e-9;  % Repetition period
 wlen    = 780 * 1e-9;   % Wavelength
-pwr_avg = 200 * 1e-3;   % Average power
+pwr_avg = 180 * 1e-3;   % Average power
 % QO LINK
 eta_opt = 0.35;         % Optical efficiency
 % PHOTOCONDUCTOR
@@ -22,6 +24,53 @@ Vb      = 30;           % Bias voltage
 Gl      = 1 / 70;       % Radiating element admittance
 % SIMULATION TIME
 t = linspace(- 10 * tau_p, 30 * tau_p, 4001);
+
+%% TEST TIMESTEP OBJECT
+[laser, GaAs] = get_default_config();
+% default t_vec
+N = 4001;
+t_vec = linspace(-20 * laser.tau_p, 20 * laser.tau_p, N);
+% constants
+qe = get_phys_const('ElectronCharge');
+h = get_phys_const('PlanckConstant');
+% parameters
+pwr_opt = 0.35 * laser.P;
+K = qe * GaAs.mu_dc * laser.T * pwr_opt ...
+    / ( (GaAs.dimensions.Wx ^ 2) * h * laser.freq * GaAs.tau_s * sqrt(2 * pi) * laser.sigma_t);
+ga = Gl;
+sigma_t = tau_p / sqrt( 8 * log(2) );
+% march-on algorithm
+march_on = TimeStep(t_vec, K = K, Vb = Vb, ga = ga, tau_c = tau_c, tau_s = tau_s, sigma_t = sigma_t);
+
+tic;
+v = NaN(1, N);
+i = NaN(1, N);
+i_int = NaN(1, N);
+for step_idx = 1 : 1 : N
+    [v(step_idx), i(step_idx), i_int(step_idx)] = step(march_on);
+end
+toc
+
+figure('Position', [250 250 1400 700]);
+subplot(2,1,1);
+yline(Vb, '--', 'LineWidth', 2.0, 'DisplayName', 'V_{b}');
+hold on;
+plot(t_vec * 1e12, v, 'LineWidth', 2.0, 'DisplayName', 'v');
+hold on;
+plot(t_vec * 1e12, Vb - v, 'LineWidth', 2.0, 'DisplayName', 'v_{g}');
+grid on;
+legend('location', 'bestoutside');
+ylabel('v / V');
+subplot(2,1,2);
+plot(t_vec * 1e12, march_on.i_impr, 'LineWidth', 2.0, 'DisplayName', 'i_{impr}');
+hold on;
+plot(t_vec * 1e12, i, 'LineWidth', 2.0, 'DisplayName', 'i');
+hold on;
+plot(t_vec * 1e12, i_int, 'LineWidth', 2.0, 'DisplayName', 'i_{int}');
+grid on;
+legend('location', 'bestoutside');
+ylabel('i / A');
+xlabel('t / ps');
 
 %% MAIN
 pwr_max = pwr_avg * T * sqrt(4 * log(2) / pi) / tau_p;
@@ -39,7 +88,7 @@ i(1)     = 0;
 
 tic;
 for m = 2 : 1 : length(t)
-    v(m)     = compute_v_step(t, m, Vb, i(m - 1), Gl, A, me_GaAs, tau_p, Wx, Wy, Wz);
+    v(m)     = compute_v_step(t, m, Vb, i(m - 1), Gl, A, me_GaAs, tau_p, tau_c, tau_s, Wx, Wy, Wz);
     i(m)     = compute_i_step(t, m, v, Vb, A, me_GaAs, tau_p, tau_c, tau_s, Wx, Wy, Wz);
 end
 toc
@@ -151,7 +200,7 @@ function im = compute_i_step(t, m, v, vb, a_const, me_pc, tau_p, tau_c, tau_s, w
     im = const * sum(im);
 end
 
-function vm = compute_v_step(t, m, vb, i_prev, gl, a_const, me_pc, tau_p, wx, wy, wz)
+function vm = compute_v_step(t, m, vb, i_prev, gl, a_const, me_pc, tau_p, tau_c, tau_s, wx, wy, wz)
     qe = get_phys_const('ElectronCharge');
     me = get_phys_const('ElectronMass');
     
@@ -160,7 +209,7 @@ function vm = compute_v_step(t, m, vb, i_prev, gl, a_const, me_pc, tau_p, wx, wy
 
     const = a_const * (qe ^ 2) * wy * wz * (dt ^ 2) / (me_pc * wx);
 
-    nom = i_prev + const * exp(- 4 * log(2) * (t(m) / tau_p) ^ 2) * vb;
+    nom = exp(- dt / tau_c) * exp(- dt / tau_s) * i_prev + const * exp(- 4 * log(2) * (t(m) / tau_p) ^ 2) * vb;
     denom = gl + const * exp(- 4 * log(2) * (t(m) / tau_p) ^ 2);
 
     vm = nom / denom;
