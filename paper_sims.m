@@ -40,7 +40,7 @@ K = qe * GaAs.mu_dc * laser.T * pwr_opt ...
 ga = Gl;
 sigma_t = tau_p / sqrt( 8 * log(2) );
 % march-on algorithm
-march_on = TimeStep(t_vec, K = K, Vb = Vb, ga = ga, tau_c = tau_c, tau_s = tau_s, sigma_t = sigma_t);
+march_on = TimeStepAlgorithm(t_vec, K = K, Vb = Vb, ga = ga, tau_c = tau_c, tau_s = tau_s, sigma_t = sigma_t);
 
 tic;
 v = NaN(1, N);
