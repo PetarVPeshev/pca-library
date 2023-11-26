@@ -41,7 +41,7 @@ classdef Laser < handle
             end
             
             % TODO: Find better solution to adding the utility path in every class.
-            addpath([pwd() '\utils']);
+            add_dir_path('utils');
             
             obj.wlen = wlen;
             obj.freq = get_phys_const('LightSpeed') / wlen;
@@ -189,4 +189,19 @@ classdef Laser < handle
                 ' ' tau_p_magn 's, T_{p} = ' num2str(round(obj.T / T_magn_order, 3)) ' ' T_magn 's']);
         end
     end
+end
+
+function add_dir_path(sub_dir)
+%ADD_FOLDER_PATH Summary of this function goes here
+%   sub_dir Sub-directory name
+    dir_path = pwd();
+    num_pca_lib = count(dir_path, '\pca-library');
+
+    lib_path = extractBefore(dir_path, '\pca-library');
+    for dir_num = 1 : 1 : num_pca_lib
+        lib_path = append(lib_path, '\pca-library');
+    end
+
+    sub_dir_path = append(lib_path, '\', sub_dir);
+    addpath(sub_dir_path);
 end

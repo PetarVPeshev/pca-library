@@ -123,7 +123,7 @@ classdef TimeStepAlgorithm < matlab.System
             % matrix )
 
             obj.i_impr = double.empty(1, 0);
-            obj.h_mn = double.empty(0, 0);
+            obj.hm_n = double.empty(0, 0);
             obj.delta_atten = 0;
         end
 

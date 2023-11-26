@@ -42,14 +42,14 @@ classdef PhotoConductiveAntenna < handle
                 pc_material         (1,1) PhotoConductor
                 Vb                  (1,1) double {mustBePositive, mustBeReal, mustBeNonNan}
                 ga                  (1,:) double {mustBeNonNan}
-                options.t_vec       (1,2) double {mustBeReal} = NaN
+                options.t_vec       (1,:) double {mustBeReal} = NaN
                 options.eta_opt     (1,1) double {mustBeInRange(options.eta_opt, 0, 1)} = 0
                 options.theta_inc   (1,1) double {mustBeInRange(options.theta_inc, 0, 90)} = 0
                 options.er_inc      (1,1) double {mustBeGreaterThanOrEqual(options.er_inc, 1), mustBeReal} = 1
             end
             
             % TODO: Find better solution to adding the utility path in every class.
-            addpath([pwd() '\utils']);
+            add_dir_path('utils');
 
             obj.laser = laser;
             obj.pc_material = pc_material;
@@ -142,5 +142,20 @@ classdef PhotoConductiveAntenna < handle
                 i_impr = i_impr * K * Vb * tau_s * sigma_t * sqrt(pi / 2);
         end
     end
+end
+
+function add_dir_path(sub_dir)
+%ADD_FOLDER_PATH Summary of this function goes here
+%   sub_dir Sub-directory name
+    dir_path = pwd();
+    num_pca_lib = count(dir_path, '\pca-library');
+
+    lib_path = extractBefore(dir_path, '\pca-library');
+    for dir_num = 1 : 1 : num_pca_lib
+        lib_path = append(lib_path, '\pca-library');
+    end
+
+    sub_dir_path = append(lib_path, '\', sub_dir);
+    addpath(sub_dir_path);
 end
 

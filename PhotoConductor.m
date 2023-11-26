@@ -38,7 +38,7 @@ classdef PhotoConductor < handle
             end
             
             % TODO: Find better solution to adding the utility path in every class.
-            addpath([pwd() '\utils']);
+            add_dir_path('utils');
 
             obj.dimensions.Wx = dimensions(1);
             obj.dimensions.Wy = dimensions(2);
@@ -79,3 +79,17 @@ classdef PhotoConductor < handle
     end
 end
 
+function add_dir_path(sub_dir)
+%ADD_FOLDER_PATH Summary of this function goes here
+%   sub_dir Sub-directory name
+    dir_path = pwd();
+    num_pca_lib = count(dir_path, '\pca-library');
+
+    lib_path = extractBefore(dir_path, '\pca-library');
+    for dir_num = 1 : 1 : num_pca_lib
+        lib_path = append(lib_path, '\pca-library');
+    end
+
+    sub_dir_path = append(lib_path, '\', sub_dir);
+    addpath(sub_dir_path);
+end
