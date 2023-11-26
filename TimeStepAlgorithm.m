@@ -222,6 +222,10 @@ classdef TimeStepAlgorithm < matlab.System
             assert(broadband == true, 'Not implemented non-broadband pca antenna algorithm.');
 
             vm = (delta_atten * i_prev + (dt ^ 2) * hm_m * Vb) / (ga + (dt ^ 2) * hm_m);
+
+            if vm > Vb
+                vm = Vb;
+            end
         end
 
         function im = compute_i_step(dt, vm, i_prev, hm, Vb, delta_atten)
