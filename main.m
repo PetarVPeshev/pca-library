@@ -10,6 +10,12 @@ addpath([pwd() '\utils']);
 %% ANTENNA RESPONSE
 [v, vg, i_impr, i_int, i] = pca.compute_response();
 
+%% COMPUTE POWER
+[Prad, ~]           = pca.compute_rad_power(pca.time_step.dt, laser.T, i, v);
+[Pt, ~]             = pca.compute_total_power(pca.time_step.dt, laser.T, i, pca.Vb);
+[Ppseudo, ~]        = pca.compute_pseudo_power(pca.time_step.dt, laser.T, i_int, v);
+[eta_pca, eta_bias] = pca.compute_efficiencies(Prad, Pt, pca.P_opt);
+
 %% PLOT RESPONSE
 figure('Position', [250 250 1400 700]);
 annotation('textbox', [.91 .60 .3 .3], 'FitBoxToText', 'on', 'BackgroundColor', 'white', ...
@@ -67,3 +73,11 @@ ylim([0 35]);
 legend('location', 'bestoutside');
 xlabel('t / ps');
 ylabel('v / V');
+
+%% PRINT RESULTS
+fprintf('Prad = %.2f mW\n', Prad * 1e3);
+fprintf('Pt = %.2f mW\n', Pt * 1e3);
+fprintf('Ppseudo = %.2f mW\n', Ppseudo * 1e3);
+fprintf('Popt = %.2f mW\n', pca.P_opt * 1e3);
+fprintf('eta_pca = %.2f\n', eta_pca);
+fprintf('eta_bias = %.2f\n', eta_bias);

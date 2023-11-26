@@ -141,6 +141,76 @@ classdef PhotoConductiveAntenna < handle
                     .* (erf(t_vec / (sqrt(2) * sigma_t) - sigma_t  * (tau_s + tau_c) / (sqrt(2) * tau_s * tau_c) + 1)) );
                 i_impr = i_impr * K * Vb * tau_s * sigma_t * sqrt(pi / 2);
         end
+
+        function [Prad, Erad] = compute_rad_power(dt, T, i, v)
+            %COMPUTE_RAD_POWER Summary of this method goes here
+            %   dt [\delta_{t}] Time step [s]
+            %   T [T_{L}] Laser repetition rate [s]
+            %   i [i(t)] Radiating current in time domain [A]
+            %   v [v(t)] Transient voltage in time domain [V]
+
+            arguments
+                dt      (1,1) double {mustBePositive, mustBeReal}
+                T       (1,1) double {mustBePositive, mustBeReal}
+                i       (1,:) double {mustBeNonNan}
+                v       (1,:) double {mustBeNonNan}
+            end
+
+            Erad = sum( abs( real(i .* v) ) ) * dt;
+            Prad = Erad / T;
+        end
+
+        function [Pt, Et] = compute_total_power(dt, T, i, Vb)
+            %COMPUTE_TOTAL_POWER Summary of this method goes here
+            %   dt [\delta_{t}] Time step [s]
+            %   T [T_{L}] Laser repetition rate [s]
+            %   i [i(t)] Radiating current in time domain [A]
+            %   Vb [V_{b}(t)] Bias voltage [V]
+
+            arguments
+                dt      (1,1) double {mustBePositive, mustBeReal}
+                T       (1,1) double {mustBePositive, mustBeReal}
+                i       (1,:) double {mustBeNonNan}
+                Vb      (1,1) double {mustBePositive, mustBeReal}
+            end
+
+            Et = sum( abs( real(i * Vb) ) ) * dt;
+            Pt = Et / T;
+        end
+
+        function [Ppseudo, Epseudo] = compute_pseudo_power(dt, T, i_int, v)
+            %COMPUTE_PSEUDO_POWER Summary of this method goes here
+            %   dt [\delta_{t}] Time step [s]
+            %   T [T_{L}] Laser repetition rate [s]
+            %   i [i(t)] Radiating current in time domain [A]
+            %   Vb [V_{b}(t)] Bias voltage [V]
+
+            arguments
+                dt      (1,1) double {mustBePositive, mustBeReal}
+                T       (1,1) double {mustBePositive, mustBeReal}
+                i_int   (1,:) double {mustBeNonNan}
+                v       (1,:) double {mustBeNonNan}
+            end
+
+            Epseudo = sum( abs( real(i_int .* v) ) ) * dt;
+            Ppseudo = Epseudo / T;
+        end
+
+        function [eta_pca, eta_bias] = compute_efficiencies(Prad, Pt, P_opt)
+            %COMPUTE_EFFICIENCIES Summary of this method goes here
+            %   Prad [P_{rad}] Radiated power [W]
+            %   Pt [P_{t}] Total power [W]
+            %   P_opt [P_{opt}] Optical power [W]
+
+            arguments
+                Prad    (1,1) double {mustBePositive, mustBeReal}
+                Pt      (1,1) double {mustBePositive, mustBeReal}
+                P_opt   (1,1) double {mustBePositive, mustBeReal}
+            end
+
+            eta_pca = Prad / P_opt;
+            eta_bias = Prad / Pt;
+        end
     end
 end
 
