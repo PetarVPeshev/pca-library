@@ -69,4 +69,3 @@ fun(i4)=fun4;
 fun=reshape(fun,size(z));
 %
 end
-
