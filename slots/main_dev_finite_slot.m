@@ -1,4 +1,4 @@
-close all;
+% close all;
 clear;
 clc;
 
@@ -210,8 +210,8 @@ function Zin = compute_Zin_single_finite(f0, ws, er1, er2, dw, d)
     Fd = @(kx) sinc(kx * dw / (2 * pi));
     Fg = @(kx) exp(1j * kx * g / 2) .* (besselj(0, kx * g / 2) - 1j * StruveH0(kx * g / 2) - (2 / pi) * sinc(kx * g / (4 * pi)) .* exp(- 1j * kx * g / 4));
     integrand_dd = @(kx) Fd(kx) .* Fd(- kx) ./ D(kx);
-    integrand_dg = @(kx) Fg(kx) .* Fd(- kx) .* exp(- 1j * kx * d) ./ D(kx);
-    integrand_gd = @(kx) Fd(kx) .* Fg(- kx) .* exp(1j * kx * d) ./ D(kx);
+    integrand_dg = @(kx) Fg(kx) .* Fd(- kx) .* exp(1j * kx * d) ./ D(kx);
+    integrand_gd = @(kx) Fd(kx) .* Fg(- kx) .* exp(- 1j * kx * d) ./ D(kx);
     integrand_gg = @(kx) Fg(kx) .* Fg(- kx) ./ D(kx);
     
     % Needs larger integration domain, due to not convergence for small delta gap

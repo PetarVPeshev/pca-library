@@ -168,13 +168,13 @@ classdef SlotInDielectrics < SlotABC
             %   Detailed explanation goes here
             c0 = get_phys_const('LightSpeed');
             eta0 = get_phys_const('VacuumImpedance');
+            eug = exp(0.57721566490153286060651209008240243);
             
             k0 = 2 * pi * f / c0;
             k1 = k0 * sqrt(obj.er_dn);
             k2 = k0 * sqrt(obj.er_up);
             
             const = eta0 * k0 * pi * obj.ws / 2;
-            eug = exp(0.57721566490153286060651209008240243);
 
             Zqs_p = - 1j * ( (k1 ^ 2) * log(k1 / 2) - (k2 ^ 2) * log(k2 / 2) ) / (pi * (k1 ^ 2 - k2 ^ 2));
             Zqs_p = Zqs_p + (1 - 1j * (2 / pi) * (log(eug * obj.d_gap) - 3 / 2)) / 2;
@@ -184,6 +184,27 @@ classdef SlotInDielectrics < SlotABC
             Zqs_pp = Zqs_pp ./ (2 * (obj.d_gap .^ 2) * (k1 ^ 2 - k2 ^ 2));
 
             Zqs = const * (Zqs_p + Zqs_pp);
+        end
+
+        function [nd, Z0] = evaluate_TL(obj, f)
+            %EVALUATE_TL Summary of this method goes here
+            %   Detailed explanation goes here
+            kxp = obj.find_kxp(f);
+
+            Dp = obj.compute_Dp(kxp, f, 'BottomSheet');
+            Z0 = - 2j / Dp;
+
+            nd = sinc(kxp * obj.d_gap / (2 * pi));
+        end
+
+        function [ZTL, Zrem] = evaluate_EC(obj, f)
+            %EVALUATE_EC Summary of this method goes here
+            %   Detailed explanation goes here
+            [nd, Z0] = obj.evaluate_TL(f);
+            ZTL = (nd ^ 2) * Z0 / 2;
+
+            Zin = obj.compute_zin(f);
+            Zrem = Zin - ZTL;
         end
     end
 
