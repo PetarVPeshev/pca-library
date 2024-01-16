@@ -13,7 +13,7 @@ addpath([pwd() '/..']);
 addpath([pwd() '/../slots']);
 addpath([pwd() '/../utils']);
 
-%% ARAMETERS
+%% PARAMETERS
 % DIELECTRICS
 er_up = 11.7;
 er_dn = 1;
