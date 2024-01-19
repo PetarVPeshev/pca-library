@@ -6,20 +6,13 @@ classdef TimeStepAlgorithm < matlab.System
     properties (SetAccess = immutable)
         t_vec       (1,:) double
         dt          (1,1) double
-    end
-
-    properties (Hidden, SetAccess = immutable)
         m_max       (1,1) double
-    end
-
-    properties (Dependent, Hidden, SetAccess = protected)
-        broadband   (1,1) logical
     end
 
     properties (Nontunable)
         K           (1,1) double
         Vb          (1,1) double
-        ga          (1,:) double
+        za          (1,:) double
         tau_c       (1,1) double
         tau_s       (1,1) double
         sigma_t     (1,1) double
@@ -27,7 +20,6 @@ classdef TimeStepAlgorithm < matlab.System
 
     properties (DiscreteState)
         m
-        v
         i
         is_done
     end
@@ -35,7 +27,7 @@ classdef TimeStepAlgorithm < matlab.System
     properties (SetAccess = protected)
         Fsm         (1,:) double
         i_impr      (1,:) double
-        delta_atten (1,1) double  % attenuation of current for one time step
+        alpha       (1,1) double  % attenuation of current for one time step
     end
 
     methods
@@ -44,7 +36,7 @@ classdef TimeStepAlgorithm < matlab.System
             %   t_vec [t] Simulation time [s]
             %   K [K] Photo-conductive antenna constant [S/s^2]
             %   Vb [V_{b}] Bias voltage [V]
-            %   ga [g_{a}] Radiating element impulse response / antenna impedance [S]
+            %   ga [g_{a}] Radiating element impulse response / antenna impedance [Ohm]
             %   tau_c [\tau_{c}] Recombination time [s]
             %   tau_s [\tau_{s}] Scattering time [s]
             %   sigma_t [\sigma_{t}] Temporal standard deviation of laser [s]
@@ -53,7 +45,7 @@ classdef TimeStepAlgorithm < matlab.System
                 t_vec           (1,:) double
                 params.K        (1,1) double = 0
                 params.Vb       (1,1) double = 0
-                params.ga       (1,:) double = 0
+                params.za       (1,:) double = 0
                 params.tau_c    (1,1) double = 0
                 params.tau_s    (1,1) double = 0
                 params.sigma_t  (1,1) double = 0
@@ -65,7 +57,7 @@ classdef TimeStepAlgorithm < matlab.System
 
             obj.K = params.K;
             obj.Vb = params.Vb;
-            obj.ga = params.ga;
+            obj.za = params.za;
             obj.tau_c = params.tau_c;
             obj.tau_s = params.tau_s;
             obj.sigma_t = params.sigma_t;
@@ -79,10 +71,10 @@ classdef TimeStepAlgorithm < matlab.System
             hm_n = obj.compute_hm_n(obj.t_vec, obj.m_max, obj.tau_c, obj.sigma_t);
             obj.Fsm = obj.compute_Fsm(obj.dt, hm_n, obj.K);
             obj.i_impr = obj.compute_i_impr(obj.t_vec, obj.m_max, hm_n, obj.Vb, obj.K, obj.tau_s);
-            obj.delta_atten = exp(- obj.dt / obj.tau_c) * exp(- obj.dt / obj.tau_s);
+            obj.alpha = exp(- obj.dt / obj.tau_c) * exp(- obj.dt / obj.tau_s);
         end
 
-        function [vm, im, im_int] = stepImpl(obj)
+        function [vm, vgm, im, im_int] = stepImpl(obj)
             % Calculate transient voltage, radiating and internal current at time step m as a function of 
             % the antenna parameters and discrete states.
 
@@ -90,19 +82,14 @@ classdef TimeStepAlgorithm < matlab.System
             obj.m = obj.m + 1;
 
             if ~obj.is_done
-                % Previous time step current
-                i_prev = 0;
-                if obj.m ~= 1
-                    i_prev = obj.i(obj.m - 1);
-                end
-
                 % Compute transient voltage at time instance m
-                vm = obj.compute_v_step(obj.m, obj.dt, obj.v, i_prev, obj.Fsm(obj.m), obj.Vb, obj.ga, ...
-                                        obj.delta_atten, obj.broadband);
-                obj.v(obj.m) = vm;
+                vm = obj.compute_v_step(obj.m, obj.dt, obj.i, obj.Fsm, obj.Vb, obj.za, obj.alpha);
+
+                % Compute gap voltage at time instance m
+                vgm = obj.Vb - vm;
 
                 % Compute radiating current at time instance m
-                im = obj.compute_i_step(obj.m, obj.dt, obj.v, obj.ga, obj.broadband);
+                im = obj.compute_i_step(obj.m, obj.i, vgm, obj.Fsm, obj.alpha);
                 obj.i(obj.m) = im;
 
                 % Compute internal current at time instance m
@@ -118,10 +105,10 @@ classdef TimeStepAlgorithm < matlab.System
         function resetImpl(obj)
             % Initialize / reset time idex to 0, and initial internal current to 0 A
 
-            obj.m = 0;
-            obj.v = NaN(1, obj.m_max);
-            obj.i = NaN(1, obj.m_max);
             obj.is_done = false;
+            obj.m = 1;
+            obj.i = NaN(1, obj.m_max);
+            obj.i(1) = 0;
         end
 
         function releaseImpl(obj)
@@ -130,7 +117,7 @@ classdef TimeStepAlgorithm < matlab.System
 
             obj.i_impr = double.empty(1, 0);
             obj.Fsm = double.empty(1, 0);
-            obj.delta_atten = 0;
+            obj.alpha = 0;
         end
 
         function validatePropertiesImpl(obj)
@@ -142,11 +129,11 @@ classdef TimeStepAlgorithm < matlab.System
             obj.check_general_property(obj.tau_s, 'tau_s');
             obj.check_general_property(obj.sigma_t, 'sigma_t');
 
-            if length(obj.ga) ~= obj.m_max && length(obj.ga) ~= 1
+            if length(obj.za) ~= obj.m_max && length(obj.za) ~= 1
                 error('TimeStep:ga:invalidSize', 'Property ga must be equal in size to t_vec, or be scalar.');
             end
 
-            if any(isnan(obj.ga))
+            if any(isnan(obj.za))
                 error('TimeStep:ga:NaN', 'Property ga contains NaN values.');
             end
         end
@@ -169,14 +156,6 @@ classdef TimeStepAlgorithm < matlab.System
                     ['Property ' property_name ' is not numeric.']);
             end
 
-        end
-    end
-
-    methods
-        function broadband = get.broadband(obj)
-            %GET.BROADBAND Summary of this method goes here
-
-            broadband = length(obj.ga) == 1;
         end
     end
 
@@ -224,7 +203,7 @@ classdef TimeStepAlgorithm < matlab.System
             i_impr = dt * Vb * tau_s * K * sum(hm_n .* (1 - exp(- (t_vec(M) - t_vec(N)) / tau_s)), 2)';
         end
 
-        function vm = compute_v_step(m, dt, v, i_prev, Fsm, Vb, ga, delta_atten, broadband)
+        function vm = compute_v_step(m, dt, i, Fsm, Vb, za, alpha)
             %COMPUTE_V_STEP Summary of this method goes here
             %   m [m] Step index [-]
             %   dt [\delta_{t}] Time step [s]
@@ -235,41 +214,14 @@ classdef TimeStepAlgorithm < matlab.System
             %   delta_atten [d\alpha] Attenuation in previous current for one time step
             %   broadband [-] Logical parameter specifying if the antenna is considered broadband [-]
 
-%             assert(broadband == true, 'Not implemented non-broadband pca antenna algorithm.');
-
-            if broadband
-                vm = (delta_atten * i_prev + Vb * Fsm) / (ga + Fsm);
+            if length(za) == 1
+                vm = za * (alpha * i(m - 1) + Vb * Fsm(m)) / (1 + za * Fsm(m));
             else
-%                 conv_part = 0;
-%                 for n = 1 : 1 : m - 1
-%                     conv_part = conv_part + v(n) * ga(m + 1 - n);
-%                 end
+                conv_part = sum( i(1 : m - 1) .* fliplr(za(2 : m)) );
 
-                if m ~= 1
-                    v = v(1 : m - 1);
-                    ga_r = fliplr( ga(2 : m) );
-                    conv_part = sum(v .* ga_r);
-                else
-                    conv_part = 0;
-                end
-
-                nom = delta_atten * i_prev + Vb * Fsm - dt * conv_part;
-                den = (dt * ga(1) + Fsm);
-                vm = nom / den;
-%                 conv_part = 0;
-%                 for n = 1 : 1 : m - 1
-%                     conv_part = conv_part + v(n) * ga(m - n + 1);
-%                 end
-
-%                 if m == 1
-%                     conv_part = 0;
-%                 else
-%                     conv_part = sum( v(1 : m - 1) .* flip(ga(m : 2)) );
-%                 end
-% 
-%                 nom = dt * delta_atten * i_prev + dt * Vb * hm - conv_part;
-%                 den = ga(1) + dt * hm;
-%                 vm = nom / den;
+                nom = conv_part + za(1) * (alpha * i(m - 1) + Vb * Fsm(m));
+                den = 1 + dt * za(1) * Fsm(m);
+                vm = dt * nom / den;
             end
 
 %             if vm > Vb
@@ -277,7 +229,7 @@ classdef TimeStepAlgorithm < matlab.System
 %             end
         end
 
-        function im = compute_i_step(m, dt, v, ga, broadband)
+        function im = compute_i_step(m, i, vgm, Fsm, alpha)
             %COMPUTE_I_STEP Summary of this method goes here
             %   dt [\delta_{t}] Time step [s]
             %   vm [v(m)] Transient voltage at time instance m [V]
@@ -286,12 +238,7 @@ classdef TimeStepAlgorithm < matlab.System
             %   Vb [V_{b}] Bias voltage [V]
             %   delta_atten [d\alpha] Attenuation in previous current for one time step
             
-            if broadband
-%                 im = delta_atten * i(m - 1) + vg(m) * Fsm;
-                im = v(m) * ga;
-            else
-                im = dt * sum( v(1 : m) .* fliplr(ga(1 : m)) );
-            end
+            im = alpha * i(m - 1) + vgm * Fsm(m);
         end
     end
 end

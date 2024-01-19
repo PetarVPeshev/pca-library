@@ -142,16 +142,15 @@ for wx_idx = 1 : 1 : length(wx_vec)
     for f_idx = 1 : 1 : length(f)
         Zin(f_idx) = slot.compute_zin(f(f_idx));
     end
-    gin = 2 * real(eval_IFT(t, f, 1./Zin));
-    gin_lawrence = IFT_frequency_to_time(1./Zin, t, f);
-%     gin = 1 ./ zin;
+    zin = 2 * real(eval_IFT(t, f, Zin));
+    zin_lawrence = IFT_frequency_to_time(Zin, t, f);
 
-%     gin(gin < 0) = 0;
+    zin(zin < 0) = 0;
 
     figure('Position', [680 558 700 420]);
-    plot(t * 1e12, gin, 'LineWidth', 1.5, 'DisplayName', 'IFT, own');
+    plot(t * 1e12, zin, 'LineWidth', 1.5, 'DisplayName', 'IFT, own');
     hold on;
-    plot(t * 1e12, gin_lawrence, '--', 'LineWidth', 1.5, 'DisplayName', 'IFT, Lawrence');
+    plot(t * 1e12, zin_lawrence, '--', 'LineWidth', 1.5, 'DisplayName', 'IFT, Lawrence');
     grid on;
     legend('location', 'bestoutside');
     xlabel('t [ps]');
@@ -162,7 +161,7 @@ for wx_idx = 1 : 1 : length(wx_vec)
         'me_coef', me_coef, 'absorp_len', alpha);
     laser = Laser(laser_wlen, T, P, 'R_3db', R_3db, 'tau_p', tau_p);
 
-    pca = PhotoConductiveAntenna(laser, pcm, Vb, gin, 'eta_opt', 1, 't_vec', t);
+    pca = PhotoConductiveAntenna(laser, pcm, Vb, zin, 'eta_opt', 1, 't_vec', t);
     [v, vg, i_impr, i_int, i] = pca.compute_response();
 
     figure('Position', [250 250 1400 700]);
