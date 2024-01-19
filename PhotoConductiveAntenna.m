@@ -17,7 +17,7 @@ classdef PhotoConductiveAntenna < handle
 
     properties
         Vb              (1,1) double {mustBeReal, mustBeNonNan}
-        ga              (1,1) double {mustBeNonNan}
+        ga              (1,:) double {mustBeNonNan}
     end
 
     properties (Dependent, SetAccess = protected)
