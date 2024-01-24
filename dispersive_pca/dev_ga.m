@@ -29,7 +29,7 @@ Zin = NaN(1, length(f));
 Z = NaN(length(x), length(f));
 for f_idx = 1 : 1 : length(f)
     Zin(f_idx) = slot.compute_zin(f(f_idx));
-    Z(:, f_idx) = evaluate_Zx(x, f(f_idx), d_gap, ws, er_up, er_dn, dx)';
+    Z(:, f_idx) = evaluate_Zx(x, f(f_idx), slot, dx)';
 end
 
 Zplt = NaN(length(x) + 1, length(f));
@@ -108,12 +108,13 @@ title(['w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \m
     num2str(dx * 1e6) ' \mum']);
 
 %% FUNCTIONS
-function Zx = evaluate_Zx(x, f, d_gap, ws, er_up, er_dn, dx)
+function Zx = evaluate_Zx(x, f, slot, dx)
     c0 = get_phys_const('LightSpeed');
     k0 = 2 * pi * f / c0;
 
-    D = @(kx) compute_D(kx, f, ws, er_up, er_dn, 'TopSheet');
-    F = @(kx) sinc(kx * d_gap / (2 * pi));
+    D = @(kx) slot.compute_D(kx, f, 'TopSheet');
+    F = @(kx) sinc(kx * slot.d_gap / (2 * pi));
+    Fx = @(kx) sinc(- kx * dx / (2 * pi));
 
     Zx = NaN(1, length(x));
     for x_idx = 1 : 1 : length(x)
@@ -122,13 +123,13 @@ function Zx = evaluate_Zx(x, f, d_gap, ws, er_up, er_dn, dx)
             end_pt = - start_pt;
             waypts = [-(1 + 1j) (1 + 1j)] * 0.01;
 
-            integrand = @(kx) F(kx) .* sinc(- kx * dx / (2 * pi)) ./ D(kx);
+            integrand = @(kx) F(kx) .* Fx(kx) ./ D(kx);
         else
             start_pt = - (0.01 + 1j * 50 * k0);
             end_pt = k0 + 0.01 - 1j * 50 * k0;
             waypts = [-(0.01 + 1j * 0.01) (0.01 + 1j * 0.01) (k0 + 1j * 0.01) (k0 + 0.01)];
 
-            integrand = @(kx) F(kx) .* sinc(- kx * dx / (2 * pi)) .* exp(- 1j * kx * abs(x(x_idx))) ./ D(kx);
+            integrand = @(kx) F(kx) .* Fx(kx) .* exp(- 1j * kx * abs(x(x_idx))) ./ D(kx);
         end
         
         Zx(x_idx) = integral(integrand, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
@@ -142,6 +143,16 @@ function y = eval_IFT(t, f, Y)
     [F, T] = meshgrid(f, t);
     Y = repmat(Y, Nt, 1);
     y = sum(Y .* exp(1j .* 2 .* pi .* F .* T), 2)' * df;
+end
+
+function Zx = evaluate_Zx_analyt(x, f, slot, dx)
+    kxp = slot.find_kxp(f);
+
+    Dp = slot.compute_Dp(kxp, f, 'BottomSheet');
+    F = sinc(kxp * slot.d_gap / (2 * pi));
+    Fx = sinc(- kxp * dx / (2 * pi));
+
+    Zx = - 1j * F * Fx * exp(- 1j * kxp * abs(x)) / Dp;
 end
 
 % OLD FUNCTIONS
