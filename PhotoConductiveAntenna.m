@@ -115,14 +115,14 @@ classdef PhotoConductiveAntenna < handle
             i = NaN(1, m_max);
             i_int = NaN(1, m_max);
             
-            for m = 2 : 1 : m_max
+            for m = 1 : 1 : m_max
                 [v(m), vg(m), i(m), i_int(m)] = step(obj.time_step);
             end
 
-            v(1) = 0;
-            vg(1) = obj.Vb;
-            i(1) = 0;
-            i_int(1) = 0;
+            % v(1) = 0;
+            % vg(1) = obj.Vb;
+            % i(1) = 0;
+            % i_int(1) = 0;
 
             i_impr = obj.time_step.i_impr;
         end

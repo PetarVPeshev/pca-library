@@ -18,6 +18,6 @@ function [laser, pc_material, pca] = get_default_config(args)
                                  tau_s = GaAs_config.tau_s, me_coef = GaAs_config.me_coef, ...
                                  absorp_len = GaAs_config.absorp_len);
 
-    pca = PhotoConductiveAntenna(laser, pc_material, pca_config.Vb, pca_config.ga, eta_opt = args.eta_opt);
+    pca = PhotoConductiveAntenna(laser, pc_material, pca_config.Vb, pca_config.ra, eta_opt = args.eta_opt);
 end
 

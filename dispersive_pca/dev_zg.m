@@ -2,6 +2,7 @@ close all;
 clear;
 clc;
 
+addpath('..');
 addpath('..\slots');
 addpath('..\utils');
 
@@ -12,10 +13,12 @@ Color = ["#0072BD", "#EDB120", "#77AC30", "#A2142F"];
 Position = [680 558 700 420];
 
 %% PARAMETERS
-f = eps : 1e9 : 2e12;
-t = -0.3e-12 : 0.001e-12 : 3e-12;
+% f = eps : 1e9 : 2e12;
+% t = -0.3e-12 : 0.001e-12 : 3e-12;
 % f = 0.05e12 : 5e9 : 2e12;             % Lawrence vectors
 % t = -0.3e-12 : 0.0001e-12 : 3e-12;    % Lawrence vectors
+t = linspace(-2, 8, 4001) * 1e-12;
+f = (0.05 : 0.005 : 2) * 1e12;
 % FEED GAP
 d_gap = 4.5 * 1e-6;
 % SLOT WIDTH
@@ -49,6 +52,10 @@ tau_p = 100 * 1e-15;
 % LASER RADIUS HALF WIDTH
 R_3db = 5 * 1e-6;
 
+%% IMPEDANCE TIME VECTOR
+t_za = t(end) + (1 : 1 : find(t == 0, 1) - 1) * (t(2) - t(1));
+t_za = [t t_za];
+
 %% NORTON GENERATOR IMPEDANCE
 for wx_idx = 1 : 1 : length(wx_vec)
     slot = SlotInDielectrics(d_gap, ws_vec(wx_idx), er_up, er_dn);
@@ -57,15 +64,15 @@ for wx_idx = 1 : 1 : length(wx_vec)
     for f_idx = 1 : 1 : length(f)
         Zin(f_idx) = slot.compute_zin(f(f_idx));
     end
-    zin = 2 * real(eval_IFT(t, f, 1./Zin));
-    zin_lawrence = IFT_frequency_to_time(1./Zin, t, f);
+    zin = 2 * real(eval_IFT(t_za, f, Zin));
+    zin_lawrence = IFT_frequency_to_time(Zin, t_za, f);
 
-    zin(zin < 0) = 0;
+    % zin(zin < 0) = 0;
 
-    figure('Position', [680 558 700 420]);
-    plot(t * 1e12, zin, 'LineWidth', 1.5, 'DisplayName', 'IFT, own');
+    figure('Position', [50 50 700 420]);
+    plot(t_za * 1e12, zin, 'LineWidth', 1.5, 'DisplayName', 'IFT, own');
     hold on;
-    plot(t * 1e12, zin_lawrence, '--', 'LineWidth', 1.5, 'DisplayName', 'IFT, Lawrence');
+    plot(t_za * 1e12, zin_lawrence, '--', 'LineWidth', 1.5, 'DisplayName', 'IFT, Lawrence');
     grid on;
     legend('location', 'bestoutside');
     xlabel('t [ps]');

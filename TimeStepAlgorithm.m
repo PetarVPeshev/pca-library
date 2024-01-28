@@ -21,14 +21,14 @@ classdef TimeStepAlgorithm < matlab.System
 
     properties (DiscreteState)
         m
-        i_int
+        i_prev
+        i
         is_done
     end
 
     properties (SetAccess = protected)
         Fsm         (1,:) double
         i_impr      (1,:) double
-        v_impr      (1,:) double
         alpha       (1,1) double  % attenuation of current for one time step
     end
 
@@ -79,18 +79,6 @@ classdef TimeStepAlgorithm < matlab.System
             hm_n = obj.compute_hm_n(obj.t_vec, obj.m_max, obj.tau_c, obj.sigma_t);
             obj.Fsm = obj.compute_Fsm(obj.dt, hm_n, obj.K);
             obj.i_impr = obj.compute_i_impr(obj.t_vec, obj.m_max, hm_n, obj.Vb, obj.K, obj.tau_s);
-            if length(obj.za) == 1
-                obj.v_impr = obj.i_impr * obj.za;
-            else
-                obj.v_impr = conv(obj.i_impr, obj.za, 'same') * obj.dt;
-%                 obj.v_impr = zeros(1, obj.m_max);
-%                 for k = 1 : 1 : obj.m_max
-%                     for j = 1 : 1 : obj.m_max
-%                         obj.v_impr(k) = obj.v_impr(k) + obj.i_impr(j) * obj.za(k - j + 1); 
-%                     end
-%                 end
-%                 obj.v_impr = obj.v_impr * obj.dt;
-            end
             obj.alpha = exp(- obj.dt / obj.tau_c) * exp(- obj.dt / obj.tau_s);
         end
 
@@ -103,18 +91,19 @@ classdef TimeStepAlgorithm < matlab.System
 
             if ~obj.is_done
                 % Compute transient voltage at time instance m
-                vm = obj.compute_v_step(obj.m, obj.t0_idx, obj.dt, obj.v_impr, obj.i_int, obj.Vb, obj.za, ...
-                                        obj.Fsm, obj.alpha);
+                vm = obj.compute_v_step(obj.m, obj.t0_idx, obj.dt, obj.i, obj.i_prev, obj.Fsm(obj.m), ...
+                                        obj.Vb, obj.za, obj.alpha);
 
                 % Compute gap voltage at time instance m
                 vgm = obj.Vb - vm;
 
-                % Compute internal current at time instance m
-                im_int = obj.compute_iint_step(obj.m, obj.i_int, vm, obj.Fsm, obj.alpha);
-                obj.i_int(obj.m) = im_int;
-
                 % Compute radiating current at time instance m
-                im = obj.i_impr(obj.m) - im_int;
+                im = obj.compute_i_step(obj.i_prev, vgm, obj.Fsm(obj.m), obj.alpha);
+                obj.i(obj.m) = im;
+                obj.i_prev = im;
+
+                % Compute internal current at time instance m
+                im_int = obj.i_impr(obj.m) - im;
 
                 % Set is_done flag to true
                 obj.is_done = obj.m == obj.m_max;
@@ -127,9 +116,9 @@ classdef TimeStepAlgorithm < matlab.System
             % Initialize / reset time idex to 0, and initial internal current to 0 A
 
             obj.is_done = false;
-            obj.m = 1;
-            obj.i_int = NaN(1, obj.m_max);
-            obj.i_int(1) = 0;
+            obj.m = 0;
+            obj.i_prev = 0;
+            obj.i = NaN(1, obj.m_max);
         end
 
         function releaseImpl(obj)
@@ -137,7 +126,6 @@ classdef TimeStepAlgorithm < matlab.System
             % matrix )
 
             obj.i_impr = double.empty(1, 0);
-            obj.v_impr = double.empty(1, 0);
             obj.Fsm = double.empty(1, 0);
             obj.alpha = 0;
         end
@@ -151,8 +139,9 @@ classdef TimeStepAlgorithm < matlab.System
             obj.check_general_property(obj.tau_s, 'tau_s');
             obj.check_general_property(obj.sigma_t, 'sigma_t');
 
-            if length(obj.za) ~= obj.m_max && length(obj.za) ~= 1
-                error('TimeStep:ga:invalidSize', 'Property ga must be equal in size to t_vec, or be scalar.');
+            if length(obj.za) ~= obj.t0_idx + obj.m_max - 1 && length(obj.za) ~= 1
+                error('TimeStep:ga:invalidSize', ['Property za must be of length t0_idx + m_max - 1, ' ...
+                    'or scalar.']);
             end
 
             if any(isnan(obj.za))
@@ -225,7 +214,7 @@ classdef TimeStepAlgorithm < matlab.System
             i_impr = dt * Vb * tau_s * K * sum(hm_n .* (1 - exp(- (t_vec(M) - t_vec(N)) / tau_s)), 2)';
         end
 
-        function vm = compute_v_step(m, t0_idx, dt, v_impr, i_int, Vb, za, Fsm, alpha)
+        function vm = compute_v_step(m, t0_idx, dt, i, i_prev, Fsm_m, Vb, za, alpha)
             %COMPUTE_V_STEP Summary of this method goes here
             %   m [m] Step index [-]
             %   dt [\delta_{t}] Time step [s]
@@ -237,50 +226,36 @@ classdef TimeStepAlgorithm < matlab.System
             %   broadband [-] Logical parameter specifying if the antenna is considered broadband [-]
 
             if length(za) == 1
-                vm = (v_impr(m) - za * alpha * i_int(m - 1)) / (1 + za * Fsm(m));
+                vm = za * (alpha * i_prev + Vb * Fsm_m) / (1 + za * Fsm_m);
             else
-                conv_part = sum( i_int(1 : m - 1) .* fliplr(za(t0_idx + (1 : m - 1))) ) * dt;
-                conv_part_2 = 0;
-                for k = 1 : 1 : m - 1
-                    conv_part_2 = conv_part_2 + i_int(k) * za(t0_idx + m - k);
-                end
-                conv_part_2 = conv_part_2 * dt;
-                if conv_part ~= conv_part_2
-                    error('TimeStep:compute_v_step:conv_part', ...
-                        ['Convolution part is not equal at m = ' num2str(m)]);
+                if m == 1
+                    conv_part = 0;
+                else
+                    u = i(1 : m - 1);
+                    v = za(t0_idx + 1 : t0_idx + m - 1);
+                    conv_part = sum(u .* fliplr(v));
                 end
 
-                nom = v_impr(m) - conv_part - dt * za(t0_idx) * alpha * i_int(m - 1);
-                den = 1 + dt * za(t0_idx) * Fsm(m);
-                vm = nom / den;
+                nom = conv_part + za(t0_idx) * (alpha * i_prev + Vb * Fsm_m);
+                den = 1 + dt * za(t0_idx) * Fsm_m;
+                vm = dt * nom / den;
             end
 
-            if vm > Vb
-                vm = Vb;
-            end
+%             if vm > Vb
+%                 vm = Vb;
+%             end
         end
 
-        function im_int = compute_iint_step(m, i_int, vm, Fsm, alpha)
-            %COMPUTE_IINT_STEP Summary of this method goes here
-            %   m [m] Sample index [-]
-            %   i_int [i_{int}(m)] Internal current [A]
-            %   vm [v(m)] Transient voltage at time instance m [V]
-            %   Fsm [F^{s}_{m}] Response at time instance m
-            %   alpha [\alpha] Attenuation in previous current for one time step [-]
-
-            im_int = alpha * i_int(m - 1) + vm * Fsm(m);
-        end
-
-        function im = compute_i_step(m, i, vgm, Fsm, alpha)
+        function im = compute_i_step(i_prev, vgm, Fsm_m, alpha)
             %COMPUTE_I_STEP Summary of this method goes here
-            %COMPUTE_IINT_STEP Summary of this method goes here
-            %   m [m] Sample index [-]
-            %   i [i(m)] Transient current [A]
+            %   dt [\delta_{t}] Time step [s]
             %   vm [v(m)] Transient voltage at time instance m [V]
-            %   Fsm [F^{s}_{m}] Response at time instance m
-            %   alpha [\alpha] Attenuation in previous current for one time step [-]
+            %   i_prev [i(m-1)] Radiating current at time instance m - 1 [A]
+            %   hm [h_{m}] Impulse response h_{m} at time instance m
+            %   Vb [V_{b}] Bias voltage [V]
+            %   delta_atten [d\alpha] Attenuation in previous current for one time step
             
-            im = alpha * i(m - 1) + vgm * Fsm(m);
+            im = alpha * i_prev + vgm * Fsm_m;
         end
     end
 end
