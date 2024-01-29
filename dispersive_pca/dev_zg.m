@@ -15,10 +15,12 @@ Position = [680 558 700 420];
 %% PARAMETERS
 % f = eps : 1e9 : 2e12;
 % t = -0.3e-12 : 0.001e-12 : 3e-12;
-% f = 0.05e12 : 5e9 : 2e12;             % Lawrence vectors
-% t = -0.3e-12 : 0.0001e-12 : 3e-12;    % Lawrence vectors
-t = linspace(-2, 8, 4001) * 1e-12;
-f = (0.05 : 0.005 : 2) * 1e12;
+f = 0.05e12 : 5e9 : 2e12;             % Lawrence vectors
+t = -0.3e-12 : 0.0001e-12 : 3e-12;    % Lawrence vectors
+% f = (0.05 : 0.005 : 2) * 1e12;
+% t = linspace(-2, 8, 4001) * 1e-12;
+dt = t(2) - t(1);
+t_za = (0 : 1 : length(t) - 1) * dt;
 % FEED GAP
 d_gap = 4.5 * 1e-6;
 % SLOT WIDTH
@@ -53,8 +55,8 @@ tau_p = 100 * 1e-15;
 R_3db = 5 * 1e-6;
 
 %% IMPEDANCE TIME VECTOR
-t_za = t(end) + (1 : 1 : find(t == 0, 1) - 1) * (t(2) - t(1));
-t_za = [t t_za];
+% t_za = t(end) + (1 : 1 : find(t == 0, 1) - 1) * (t(2) - t(1));
+% t_za = [t t_za];
 
 %% NORTON GENERATOR IMPEDANCE
 for wx_idx = 1 : 1 : length(wx_vec)
@@ -64,15 +66,15 @@ for wx_idx = 1 : 1 : length(wx_vec)
     for f_idx = 1 : 1 : length(f)
         Zin(f_idx) = slot.compute_zin(f(f_idx));
     end
-    zin = 2 * real(eval_IFT(t_za, f, Zin));
-    zin_lawrence = IFT_frequency_to_time(Zin, t_za, f);
+    gin = 2 * real(eval_IFT(t_za, f, 1./Zin));
+    gin_lawrence = IFT_frequency_to_time(1./Zin, t_za, f);
 
     % zin(zin < 0) = 0;
 
     figure('Position', [50 50 700 420]);
-    plot(t_za * 1e12, zin, 'LineWidth', 1.5, 'DisplayName', 'IFT, own');
+    plot(t_za * 1e12, gin, 'LineWidth', 1.5, 'DisplayName', 'IFT, own');
     hold on;
-    plot(t_za * 1e12, zin_lawrence, '--', 'LineWidth', 1.5, 'DisplayName', 'IFT, Lawrence');
+    plot(t_za * 1e12, gin_lawrence, '--', 'LineWidth', 1.5, 'DisplayName', 'IFT, Lawrence');
     grid on;
     legend('location', 'bestoutside');
     xlabel('t [ps]');
@@ -83,7 +85,7 @@ for wx_idx = 1 : 1 : length(wx_vec)
         'me_coef', me_coef, 'absorp_len', alpha);
     laser = Laser(laser_wlen, T, P, 'R_3db', R_3db, 'tau_p', tau_p);
 
-    pca = PhotoConductiveAntenna(laser, pcm, Vb, zin, 'eta_opt', 1, 't_vec', t);
+    pca = PhotoConductiveAntenna(laser, pcm, Vb, gin, 'eta_opt', 1, 't_vec', t);
     [v, vg, i_impr, i_int, i] = pca.compute_response();
 
     figure('Position', [250 250 1400 700]);
@@ -100,7 +102,7 @@ for wx_idx = 1 : 1 : length(wx_vec)
     % LASER
     subplot(3, 1, 1);
     
-    plot(pca.time_step.t_vec * 1e12, exp(- 0.5 * (pca.time_step.t_vec / laser.sigma_t) .^ 2), ...
+    plot(pca.time_step.t * 1e12, exp(- 0.5 * (pca.time_step.t / laser.sigma_t) .^ 2), ...
         'LineWidth', 2.0, 'DisplayName', ['P_{L}, \delta_{t} = ' num2str(pca.time_step.dt * 1e15) ' fs']);
     hold on;
     xline(- laser.tau_p * 1e12, '--', 'LineWidth', 2.0, 'Color', [1 0 1], 'DisplayName', '-\tau_{p}');
@@ -108,7 +110,7 @@ for wx_idx = 1 : 1 : length(wx_vec)
     xline(laser.tau_p * 1e12, '--', 'LineWidth', 2.0, 'Color', [1 0 1], 'DisplayName', '\tau_{p}');
     
     grid on;
-    xlim([-1 2]);
+    xlim([min(t * 1e12) 2]);
     legend('location', 'bestoutside');
     
     ylabel('P_{L} / kW');
@@ -116,18 +118,18 @@ for wx_idx = 1 : 1 : length(wx_vec)
     % CURRENTS
     subplot(3, 1, 2);
     
-    plot(pca.time_step.t_vec * 1e12, i_impr, 'LineWidth', 2.0, ...
+    plot(pca.time_step.t * 1e12, i_impr, 'LineWidth', 2.0, ...
         'DisplayName', ['i_{impr}, \delta_{t} = ' num2str(pca.time_step.dt * 1e15) ' fs']);
     hold on;
-    plot(pca.time_step.t_vec * 1e12, i_int, 'LineWidth', 2.0, ...
+    plot(pca.time_step.t * 1e12, i_int, 'LineWidth', 2.0, ...
         'DisplayName', ['i_{int}, \delta_{t} = ' num2str(pca.time_step.dt * 1e15) ' fs']);
     hold on;
-    plot(pca.time_step.t_vec * 1e12, i, 'LineWidth', 2.0, ...
+    plot(pca.time_step.t * 1e12, i, 'LineWidth', 2.0, ...
         'DisplayName', ['i, \delta_{t} = ' num2str(pca.time_step.dt * 1e15) ' fs']);
     
     grid on;
-    xlim([-1 2]);
-    ylim([0 3]);
+    xlim([min(t * 1e12) 2]);
+    ylim([0 0.4]);
     legend('location', 'bestoutside');
     
     xlabel('t / ps');
@@ -138,14 +140,14 @@ for wx_idx = 1 : 1 : length(wx_vec)
     
     yline(pca.Vb, '--', 'LineWidth', 2.0, 'DisplayName', 'V_{b}');
     hold on;
-    plot(pca.time_step.t_vec * 1e12, v, 'LineWidth', 2.0, ...
+    plot(pca.time_step.t * 1e12, v, 'LineWidth', 2.0, ...
         'DisplayName', ['v, \delta_t = ' num2str(pca.time_step.dt * 1e15) ' fs']);
     hold on;
-    plot(pca.time_step.t_vec * 1e12, vg, 'LineWidth', 2.0, ...
+    plot(pca.time_step.t * 1e12, vg, 'LineWidth', 2.0, ...
         'DisplayName', ['v_{g}, \delta_{t} = ' num2str(pca.time_step.dt * 1e15) ' fs']);
     
     grid on;
-    xlim([-1 2]);
+    xlim([min(t * 1e12) 2]);
     ylim([0 35]);
     legend('location', 'bestoutside');
     

@@ -17,7 +17,7 @@ classdef PhotoConductiveAntenna < handle
 
     properties
         Vb              (1,1) double {mustBeReal, mustBeNonNan}
-        za              (1,:) double {mustBeNonNan}
+        ga              (1,:) double {mustBeNonNan}
     end
 
     properties (Dependent, SetAccess = protected)
@@ -26,7 +26,7 @@ classdef PhotoConductiveAntenna < handle
     end
     
     methods
-        function obj = PhotoConductiveAntenna(laser, pc_material, Vb, za, options)
+        function obj = PhotoConductiveAntenna(laser, pc_material, Vb, ga, options)
             %PHOTOCONDUCTIVEANTENNA Construct an instance of this class
             %   laser Pulsed laser object
             %   pc_material Photo-conductor object
@@ -41,7 +41,7 @@ classdef PhotoConductiveAntenna < handle
                 laser               (1,1) Laser
                 pc_material         (1,1) PhotoConductor
                 Vb                  (1,1) double {mustBePositive, mustBeReal, mustBeNonNan}
-                za                  (1,:) double {mustBeNonNan}
+                ga                  (1,:) double {mustBeNonNan}
                 options.t_vec       (1,:) double {mustBeReal} = NaN
                 options.eta_opt     (1,1) double {mustBeInRange(options.eta_opt, 0, 1)} = 0
                 options.theta_inc   (1,1) double {mustBeInRange(options.theta_inc, 0, 90)} = 0
@@ -55,7 +55,7 @@ classdef PhotoConductiveAntenna < handle
             obj.pc_material = pc_material;
 
             obj.Vb = Vb;
-            obj.za = za;
+            obj.ga = ga;
 
             obj.qo_link = QuasiOpticalLink(laser, pc_material, eta_opt = options.eta_opt, ...
                                            theta_inc = options.theta_inc, er_inc = options.er_inc);
@@ -102,13 +102,13 @@ classdef PhotoConductiveAntenna < handle
             % Update parameters
             obj.time_step.K = obj.K;
             obj.time_step.Vb = obj.Vb;
-            obj.time_step.za = obj.za;
+            obj.time_step.ga = obj.ga;
             obj.time_step.tau_c = obj.pc_material.tau_rec;
             obj.time_step.tau_s = obj.pc_material.tau_s;
             obj.time_step.sigma_t = obj.laser.sigma_t;
 
             % Compute response
-            m_max = length(obj.time_step.t_vec);
+            m_max = length(obj.time_step.t);
             
             v = NaN(1, m_max);
             vg = NaN(1, m_max);
@@ -118,11 +118,6 @@ classdef PhotoConductiveAntenna < handle
             for m = 1 : 1 : m_max
                 [v(m), vg(m), i(m), i_int(m)] = step(obj.time_step);
             end
-
-            % v(1) = 0;
-            % vg(1) = obj.Vb;
-            % i(1) = 0;
-            % i_int(1) = 0;
 
             i_impr = obj.time_step.i_impr;
         end
