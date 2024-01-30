@@ -2,159 +2,233 @@ close all;
 clear;
 clc;
 
-addpath('..');
-addpath('..\slots');
-addpath('..\utils');
+addpath('..', '..\slots', '..\utils');
+
+% er_up : medium 2, er_dn : medium 1
+config_slot  = struct('er_up', 11.7, 'er_dn', 1);
+config_laser = struct('wlen', 780 * 1e-9, 'T', 12.5 * 1e-9, 'tau_p', 100 * 1e-15, 'R_3db', 5 * 1e-6);
+config_pcm   = struct('wz', 2 * 1e-6, 'er', 12.96, 'tau_rec', 300 * 1e-15, 'tau_s', 8.5 * 1e-15, ...
+                      'me_coef', 0.067, 'alpha', 1 * 1e-6);
 
 LineLegend = {'\Re', '\Im'};
-Location = 'bestoutside';
-LineWidth = 1.5;
-Color = ["#0072BD", "#EDB120", "#77AC30", "#A2142F"];
-Position = [680 558 700 420];
+Location   = 'bestoutside';
+LineWidth  = 1.5;
+Color      = ["#0072BD", "#EDB120", "#77AC30", "#A2142F"];
+Position   = [680 558 700 420];
 
 %% PARAMETERS
-% f = eps : 1e9 : 2e12;
-% t = -0.3e-12 : 0.001e-12 : 3e-12;
-f = 0.05e12 : 5e9 : 2e12;             % Lawrence vectors
-t = -0.3e-12 : 0.0001e-12 : 3e-12;    % Lawrence vectors
-% f = (0.05 : 0.005 : 2) * 1e12;
-% t = linspace(-2, 8, 4001) * 1e-12;
-dt = t(2) - t(1);
-t_za = (0 : 1 : length(t) - 1) * dt;
+f = linspace(eps, 2, 4001) * 1e12;
+t = linspace(-2, 8, 4001) * 1e-12;
 % FEED GAP
 d_gap = 4.5 * 1e-6;
 % SLOT WIDTH
+ws     = 10 * 1e-6;
 ws_vec = (10 : - 2.5 : 2.5) * 1e-6;
-% DIELECTRICS
-er_up = 11.7;  % medium 2
-er_dn = 1;     % medium 1
-% PHOTOCONDUCTOR DIMENSIONS
-wx_vec = ws_vec;    % gap between metal
-wy = d_gap;         % in PhotoConductiveAntenna the gap between the metal is wx
-wz = 2 * 1e-6;
-% PHOTOCONDUCTOR RELATIVE PERMITTIVITY
-er_pcm = 12.96;
-% RECOMBINATION AND SCATTERING TIME
-tau_rec = 300 * 1e-15;
-tau_s = 8.5 * 1e-15;
-% EFFECTIVE ELECTRON MASS COEFFICIENT
-me_coef = 0.067;
-% ABSORPTION LENGTH
-alpha = 1 * 1e-6;
 % BIAS
 Vb = 30;
-% LASER WAVELENGTH
-laser_wlen = 780 * 1e-9;
-% LASER PERIOD
-T = 12.5 * 1e-9;
 % OPTICAL POWER
-P = 10 * 1e-3;
-% LASER FWHM
-tau_p = 100 * 1e-15;
-% LASER RADIUS HALF WIDTH
-R_3db = 5 * 1e-6;
+P     = 10 * 1e-3;
+P_vec = (5 : 10 : 35) * 1e-3;
+% NUMBER OF POINTS
+Nf  = length(f);
+Nt  = length(t);
+Nws = length(ws_vec);
+NP  = length(P_vec);
+% ADMITTANCE TIME VECTOR
+t_ga = (0 : 1 : length(t) - 1) * (t(2) - t(1));
 
-%% IMPEDANCE TIME VECTOR
-% t_za = t(end) + (1 : 1 : find(t == 0, 1) - 1) * (t(2) - t(1));
-% t_za = [t t_za];
+%% CREATE LASER, AND TIME-STEP ALGORITHM OBJECTS
+laser     = create_laser_object(config_laser, 'P', P);
+time_step = TimeStepAlgorithmWeight(t);
 
-%% NORTON GENERATOR IMPEDANCE
-for wx_idx = 1 : 1 : length(wx_vec)
-    slot = SlotInDielectrics(d_gap, ws_vec(wx_idx), er_up, er_dn);
+%% INTERNAL IMPEDANCE
+% In terms of slot width
+Z_int       = NaN(Nws, Nf);
+ColorLegend = cell(1, Nws);
+for ws_idx = 1 : 1 : Nws
+    % Create slot, and pcm objects
+    slot = SlotInDielectrics(d_gap, ws_vec(ws_idx), config_slot.er_up, config_slot.er_dn);
+    pcm  = create_pcm_object(config_pcm, 'd_gap', d_gap, 'ws', ws_vec(ws_idx));
 
-    Zin = NaN(1, length(f));
-    for f_idx = 1 : 1 : length(f)
+    % Frequency-domain admittance
+    Zin = NaN(1, Nf);
+    for f_idx = 1 : 1 : Nf
         Zin(f_idx) = slot.compute_zin(f(f_idx));
     end
-    gin = 2 * real(eval_IFT(t_za, f, 1./Zin));
-    gin_lawrence = IFT_frequency_to_time(1./Zin, t_za, f);
 
-    % zin(zin < 0) = 0;
+    % Time-domain admittance
+    gin = 2 * real(eval_IFT(t_ga, f, 1 ./ Zin));
+    w   = 2 * real(eval_IFT(t_ga, f, (1 ./ Zin) .^ 2));
 
-    figure('Position', [50 50 700 420]);
-    plot(t_za * 1e12, gin, 'LineWidth', 1.5, 'DisplayName', 'IFT, own');
+    % Create photo-conductive antenna object
+    pca = PhotoConductiveAntenna(laser, pcm, Vb, gin, 't_vec', t, 'eta_opt', 1);
+
+    % Set time-step algorithm parameters
+    time_step.K       = pca.K;
+    time_step.Vb      = Vb;
+    time_step.ga      = gin;
+    time_step.w       = w;
+    time_step.tau_c   = pcm.tau_rec;
+    time_step.tau_s   = pcm.tau_s;
+    time_step.sigma_t = laser.sigma_t;
+
+    % Voltage and currents
+    v     = NaN(1, Nt);
+    i     = v;
+    i_int = v;
+
+    for m = 1 : 1 : Nt
+        [v(m), ~, i(m), i_int(m)] = step(time_step);
+    end
+
+    i_impr = time_step.i_impr;
+
+    % Plot currents
+    figure('Position', [680 558 650 370]);
+
+    plot(t * 1e12, i, 'LineWidth', LineWidth, 'DisplayName', 'i');
     hold on;
-    plot(t_za * 1e12, gin_lawrence, '--', 'LineWidth', 1.5, 'DisplayName', 'IFT, Lawrence');
+    plot(t * 1e12, i_impr, 'LineWidth', LineWidth, 'DisplayName', 'i_{impr}');
+    hold on;
+    plot(t * 1e12, i_int, 'LineWidth', LineWidth, 'DisplayName', 'i_{int}');
+
+    box off;
     grid on;
     legend('location', 'bestoutside');
+    xlim([-0.5 2.5]);
+
     xlabel('t [ps]');
-    ylabel('z_{in} [\Omega]');
-    title(['@ w_{s} = ' num2str(ws_vec(wx_idx) * 1e6) ' \mum']);
-    
-    pcm = PhotoConductor([wx_vec(wx_idx) wy wz], er_pcm, 'tau_rec', tau_rec, 'tau_s', tau_s, ...
-        'me_coef', me_coef, 'absorp_len', alpha);
-    laser = Laser(laser_wlen, T, P, 'R_3db', R_3db, 'tau_p', tau_p);
+    ylabel('[A]');
+    title(['@ w_{y} = ' num2str(ws_vec(ws_idx) * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ...
+           ' \mum, P_{opt} = ' num2str(P * 1e3) ' mW, V_{b} = ' num2str(Vb) ' V']);
 
-    pca = PhotoConductiveAntenna(laser, pcm, Vb, gin, 'eta_opt', 1, 't_vec', t);
-    [v, vg, i_impr, i_int, i] = pca.compute_response();
+    % Frequency domain of transient voltage and internal current
+    V     = eval_FT(t, f, v);
+    I_int = eval_FT(t, f, i_int);
 
-    figure('Position', [250 250 1400 700]);
-    annotation('textbox', [.91 .60 .3 .3], 'FitBoxToText', 'on', 'BackgroundColor', 'white', ...
-        'String', {'----QO LINK----',['\eta_{opt} = ' num2str(pca.qo_link.eta_opt)], ...
-        ['P_{L} = ' num2str(laser.P * 1e3) ' mW'], ['T_{L} = ' num2str(laser.T * 1e9) ' ns'], ...
-        ['\tau_{p} = ' num2str(laser.tau_p * 1e15) ' fs'], '------GaAs------', ...
-        ['\tau_{s} = ' num2str(pcm.tau_s * 1e15) ' fs'], ['\tau_{c} = ' num2str(pcm.tau_rec * 1e15) ' fs'], ...
-        ['W_{x} = ' num2str(pcm.dimensions.Wx * 1e6) ' \mum'], ...
-        ['W_{y} = ' num2str(pcm.dimensions.Wy * 1e6) ' \mum'], ...
-        ['W_{z} = ' num2str(pcm.dimensions.Wz * 1e6) ' \mum']})
-    sgtitle('Photo-Conductive Antenna Simulations', 'FontWeight', 'bold');
-    
-    % LASER
-    subplot(3, 1, 1);
-    
-    plot(pca.time_step.t * 1e12, exp(- 0.5 * (pca.time_step.t / laser.sigma_t) .^ 2), ...
-        'LineWidth', 2.0, 'DisplayName', ['P_{L}, \delta_{t} = ' num2str(pca.time_step.dt * 1e15) ' fs']);
-    hold on;
-    xline(- laser.tau_p * 1e12, '--', 'LineWidth', 2.0, 'Color', [1 0 1], 'DisplayName', '-\tau_{p}');
-    hold on;
-    xline(laser.tau_p * 1e12, '--', 'LineWidth', 2.0, 'Color', [1 0 1], 'DisplayName', '\tau_{p}');
-    
-    grid on;
-    xlim([min(t * 1e12) 2]);
-    legend('location', 'bestoutside');
-    
-    ylabel('P_{L} / kW');
-    
-    % CURRENTS
-    subplot(3, 1, 2);
-    
-    plot(pca.time_step.t * 1e12, i_impr, 'LineWidth', 2.0, ...
-        'DisplayName', ['i_{impr}, \delta_{t} = ' num2str(pca.time_step.dt * 1e15) ' fs']);
-    hold on;
-    plot(pca.time_step.t * 1e12, i_int, 'LineWidth', 2.0, ...
-        'DisplayName', ['i_{int}, \delta_{t} = ' num2str(pca.time_step.dt * 1e15) ' fs']);
-    hold on;
-    plot(pca.time_step.t * 1e12, i, 'LineWidth', 2.0, ...
-        'DisplayName', ['i, \delta_{t} = ' num2str(pca.time_step.dt * 1e15) ' fs']);
-    
-    grid on;
-    xlim([min(t * 1e12) 2]);
-    ylim([0 0.4]);
-    legend('location', 'bestoutside');
-    
-    xlabel('t / ps');
-    ylabel('i / A');
-    
-    % VOLTAGES
-    subplot(3, 1, 3);
-    
-    yline(pca.Vb, '--', 'LineWidth', 2.0, 'DisplayName', 'V_{b}');
-    hold on;
-    plot(pca.time_step.t * 1e12, v, 'LineWidth', 2.0, ...
-        'DisplayName', ['v, \delta_t = ' num2str(pca.time_step.dt * 1e15) ' fs']);
-    hold on;
-    plot(pca.time_step.t * 1e12, vg, 'LineWidth', 2.0, ...
-        'DisplayName', ['v_{g}, \delta_{t} = ' num2str(pca.time_step.dt * 1e15) ' fs']);
-    
-    grid on;
-    xlim([min(t * 1e12) 2]);
-    ylim([0 35]);
-    legend('location', 'bestoutside');
-    
-    xlabel('t / ps');
-    ylabel('v / V');
+    % Internal impedance
+    Z_int(ws_idx, :) = V ./ I_int;
 
+    % Release and reset algorithm
+    release(time_step);
+    reset(time_step);
+
+    % Legend
+    ColorLegend(ws_idx) = cellstr(['w_{y} = ' num2str(ws_vec(ws_idx) * 1e6) ' \mum']);
 end
+
+XLabel = 'f [THz]';
+YLabel = 'Z_{int} [\Omega]';
+Title = ['@ \Delta = ' num2str(d_gap * 1e6) ' \mum, P_{opt} = ' num2str(P * 1e3) ' mW, V_{b} = ' ...
+         num2str(Vb) ' V'];
+
+plot_two(f * 1e-12, real(Z_int), imag(Z_int), 'ColorLegend', ColorLegend, 'LineLegend', LineLegend, ...
+    'ColorLocation', Location, 'LineLocation', Location, 'LineWidth', LineWidth, 'Color', ...
+    Color, 'XLabel', XLabel, 'YLabel', YLabel, 'Title', Title, 'Position', Position);
+grid on;
+
+% Create slot, and pcm objects
+slot = SlotInDielectrics(d_gap, ws, config_slot.er_up, config_slot.er_dn);
+pcm  = create_pcm_object(config_pcm, 'd_gap', d_gap, 'ws', ws);
+
+% Frequency-domain admittance
+Zin = NaN(1, Nf);
+for f_idx = 1 : 1 : Nf
+    Zin(f_idx) = slot.compute_zin(f(f_idx));
+end
+
+% Time-domain admittance
+gin = 2 * real(eval_IFT(t_ga, f, 1 ./ Zin));
+w   = 2 * real(eval_IFT(t_ga, f, (1 ./ Zin) .^ 2));
+
+% Set time-step algorithm parameters
+time_step.Vb      = Vb;
+time_step.ga      = gin;
+time_step.w       = w;
+time_step.tau_c   = pcm.tau_rec;
+time_step.tau_s   = pcm.tau_s;
+time_step.sigma_t = laser.sigma_t;
+
+% Create pca object
+pca = PhotoConductiveAntenna(laser, pcm, Vb, gin, 't_vec', t, 'eta_opt', 1);
+
+% In terms of optical power
+Z_int       = NaN(NP, Nf);
+ColorLegend = cell(1, NP);
+for P_idx = 1 : 1 : NP
+    % Set laser power
+    laser.P = P_vec(P_idx);
+
+    % Set time-step algorithm K constant
+    time_step.K = pca.K;
+
+    % Voltage and currents
+    v     = NaN(1, Nt);
+    i     = v;
+    i_int = v;
+
+    for m = 1 : 1 : Nt
+        [v(m), ~, i(m), i_int(m)] = step(time_step);
+    end
+
+    i_impr = time_step.i_impr;
+
+    % Plot voltage and currents
+    figure('Position', [680 558 650 370]);
+
+    plot(t * 1e12, v, 'LineWidth', LineWidth, 'DisplayName', 'v');
+
+    box off;
+    grid on;
+    xlim([-0.5 2.5]);
+
+    xlabel('t [ps]');
+    ylabel('v [V]');
+    title(['@ w_{y} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, P_{opt} = ' ...
+           num2str(P_vec(P_idx) * 1e3) ' mW, V_{b} = ' num2str(Vb) ' V']);
+
+    figure('Position', [680 558 650 370]);
+
+    plot(t * 1e12, i, 'LineWidth', LineWidth, 'DisplayName', 'i');
+    hold on;
+    plot(t * 1e12, i_impr, 'LineWidth', LineWidth, 'DisplayName', 'i_{impr}');
+    hold on;
+    plot(t * 1e12, i_int, 'LineWidth', LineWidth, 'DisplayName', 'i_{int}');
+
+    box off;
+    grid on;
+    legend('location', 'bestoutside');
+    xlim([-0.5 2.5]);
+
+    xlabel('t [ps]');
+    ylabel('[A]');
+    title(['@ w_{y} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, P_{opt} = ' ...
+           num2str(P_vec(P_idx) * 1e3) ' mW, V_{b} = ' num2str(Vb) ' V']);
+
+    % Frequency domain of transient voltage and internal current
+    V     = eval_FT(t, f, v);
+    I_int = eval_FT(t, f, i_int);
+
+    % Internal impedance
+    Z_int(P_idx, :) = V ./ I_int;
+
+    % Release and reset algorithm
+    release(time_step);
+    reset(time_step);
+
+    % Legend
+    ColorLegend(P_idx) = cellstr(['P_{opt} = ' num2str(P_vec(P_idx) * 1e3) ' mW']);
+end
+
+XLabel = 'f [THz]';
+YLabel = 'Z_{int} [\Omega]';
+Title = ['@ w_{y} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, V_{b} = ' ...
+         num2str(Vb) ' V'];
+
+plot_two(f * 1e-12, real(Z_int), imag(Z_int), 'ColorLegend', ColorLegend, 'LineLegend', LineLegend, ...
+    'ColorLocation', Location, 'LineLocation', Location, 'LineWidth', LineWidth, 'Color', ...
+    Color, 'XLabel', XLabel, 'YLabel', YLabel, 'Title', Title, 'Position', Position);
+grid on;
 
 %% FUNCTIONS
 function Y = eval_FT(t, f, y)
@@ -176,31 +250,25 @@ function y = eval_IFT(t, f, Y)
     y = sum(Y .* exp(1j .* 2 .* pi .* F .* T), 2)' * df;
 end
 
-function y = eval_DIFFT(Y)
-    N = length(Y);
+% FUNCTIONS USED TO CREATE OBJECTS
+function laser = create_laser_object(laser_config, params)
+    arguments
+        laser_config (1,1) struct
+        params.P     (1,1) double
+    end
 
-    Y_temp = NaN(1, 2 * N);
-    Y_temp(1 : N) = Y;
-    Y_temp(N + 1 : end) = fliplr(Y);
-
-    y = ifft(Y_temp, 'symmetric');
-%     y = ifft(Y);
+    laser = Laser(laser_config.wlen, laser_config.T, params.P, 'tau_p', laser_config.tau_p, ...
+                  'R_3db', laser_config.R_3db);
 end
 
-function [f] = IFT_frequency_to_time( F, t, freq )
-% This function calculates the Fourier transform from frequency to time for
-% a signal with a given frequency vector [Hz] and time-domain [s] over which one would
-% like to know the Fourier transform. Make sure the frequency points are
-% evenly spaced. For this FT only positive frequencies are required which
-% is valid for real space-time functions.
-
-    omega = 2 .* pi .* freq;                                        % angular frequency [rad/s]
-    d_omega = omega(2) - omega(1);                                  % spacing in time [s]
-    if d_omega < 0; disp("Watch definition frequency vector"); end  % if d_omega becomes negative show a message to bring this to the user's attention
-    
-    f = zeros(1, length(t) );                                       % initialize output vector
-    for tt = 1:length(t)                                            % compute FT for each frequency point
-        f(tt) = sum( F .* exp( 1i .* omega .* t(tt) ) ) .* d_omega;
-        f(tt) = real( f(tt) ) ./ pi;
+function pcm = create_pcm_object(pcm_config, params)
+    arguments
+        pcm_config   (1,1) struct
+        params.d_gap (1,1) double
+        params.ws    (1,1) double
     end
+
+    pcm = PhotoConductor([params.ws params.d_gap pcm_config.wz], pcm_config.er, ...
+                         'tau_rec', pcm_config.tau_rec, 'tau_s', pcm_config.tau_s, ...
+                         'me_coef', pcm_config.me_coef, 'absorp_len', pcm_config.alpha);
 end

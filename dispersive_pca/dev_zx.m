@@ -2,14 +2,13 @@ close all;
 clear;
 clc;
 
-addpath('..\slots');
-addpath('..\utils');
+addpath('..\slots', '..\utils');
 
-Position = [680 558 700 420];
+Position   = [680 558 700 420];
 LineLegend = {'Z_{x}', 'Res\{Z_{x}\}'};
-Location = 'bestoutside';
-LineWidth = 1.5;
-Color = ["#0072BD", "#EDB120", "#7E2F8E", "#77AC30", "#A2142F"];
+Location   = 'bestoutside';
+LineWidth  = 1.5;
+Color      = ["#0072BD", "#EDB120", "#7E2F8E", "#77AC30", "#A2142F"];
 
 %% PARAMETERS
 f = linspace(eps, 2, 4001) * 1e12;

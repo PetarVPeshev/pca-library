@@ -2,14 +2,13 @@ close all;
 clear;
 clc;
 
-addpath('..\slots');
-addpath('..\utils');
+addpath('..\slots', '..\utils');
 
 LineLegend = {'\Re', '\Im'};
-Location = 'bestoutside';
-LineWidth = 1.5;
-Color = ["#0072BD", "#EDB120", "#77AC30", "#A2142F"];
-Position = [680 558 700 420];
+Location   = 'bestoutside';
+LineWidth  = 1.5;
+Color      = ["#0072BD", "#EDB120", "#77AC30", "#A2142F"];
+Position   = [680 558 700 420];
 
 %% PARAMETERS
 f = linspace(eps, 2e12, 1001);

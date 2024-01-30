@@ -78,7 +78,7 @@ classdef TimeStepAlgorithmWeight < matlab.System
             hm_n       = obj.compute_hm_n(obj.t, obj.tau_c, obj.sigma_t);
             obj.Fsm    = obj.compute_Fsm(obj.dt, hm_n, obj.K);
             obj.i_impr = obj.compute_i_impr(obj.t, hm_n, obj.Vb, obj.K, obj.tau_s);
-            obj.v_impr = conv(obj.i_impr, obj.ga, 'same');
+            obj.v_impr = obj.compute_v_impr(obj.i_impr, obj.ga);
             obj.alpha  = exp(- obj.dt / obj.tau_c) * exp(- obj.dt / obj.tau_s);
         end
 
@@ -220,7 +220,7 @@ classdef TimeStepAlgorithmWeight < matlab.System
             m_max = length(t);
             if ~isequal([m_max m_max], size(hm_n))
                 error('TimeStepWeight:compute_i_impr:notEqualSize', ...
-                    'Argument hm_n has incompatible size to t.');
+                      'Argument hm_n has incompatible size to t.');
             end
 
             dt = t(2) - t(1);
@@ -228,6 +228,23 @@ classdef TimeStepAlgorithmWeight < matlab.System
         
             bm_n = tril(1 - exp(- (t(M) - t(N)) / tau_s));
             i_impr = dt * Vb * K * tau_s * sum(hm_n .* bm_n, 2)';
+        end
+
+        function v_impr = compute_v_impr(i_impr, ga)
+            %COMPUTE_V_IMPR Summary of this method goes here
+            %   i_impr [i_{impr}] Impressed current [A]
+            %   ga [g_{a}] Antenna impulse response admittance [S]
+
+            Nga = length(ga);
+            if length(i_impr) ~= Nga
+                error('TimeStepWeight:compute_v_impr:notEqualSize', ...
+                      'Arguments i_impr and ga must be of equal length');
+            end
+
+            v_impr = NaN(1, Nga);
+            for m = 1 : 1 : Nga
+                v_impr(m) = sum(i_impr(1 : m) .* fliplr(ga(1 : m)));
+            end
         end
 
         function vm = compute_vm(m, v, vm_impr, i_int, i_int_prev, Vb, gl, w, Fsm_m, alpha)

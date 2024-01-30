@@ -2,8 +2,7 @@ close all;
 clear;
 clc;
 
-addpath('..\slots');
-addpath('..\utils');
+addpath('..\slots', '..\utils');
 
 %% PARAMETERS
 t = linspace(-2, 10, 2001) * 1e-12;
