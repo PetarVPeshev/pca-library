@@ -50,7 +50,7 @@ for ws_idx = 1 : 1 : Nws
     slot = SlotInDielectrics(d_gap, ws_vec(ws_idx), config_slot.er_up, config_slot.er_dn);
     pcm  = create_pcm_object(config_pcm, 'd_gap', d_gap, 'ws', ws_vec(ws_idx));
 
-    % Frequency-domain admittance
+    % Frequency-domain impedance
     Zin = NaN(1, Nf);
     for f_idx = 1 : 1 : Nf
         Zin(f_idx) = slot.compute_zin(f(f_idx));
