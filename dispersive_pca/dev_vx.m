@@ -10,11 +10,15 @@ config_laser = struct('wlen', 780 * 1e-9, 'T', 12.5 * 1e-9, 'tau_p', 100 * 1e-15
 config_pcm   = struct('wz', 2 * 1e-6, 'er', 12.96, 'tau_rec', 300 * 1e-15, 'tau_s', 8.5 * 1e-15, ...
                       'me_coef', 0.067, 'alpha', 1 * 1e-6);
 
+% Plot time indecies
+t_plt = [2066 2501 3001 4001 5001];
+
+% Plot x indecies
+x_plt = [401 501 601 701];
+
 %% PARAMETERS
-% f = linspace(eps, 2, 4001) * 1e12;
-% t = linspace(-0.5, 5, 4001) * 1e-12;
 f = (0.05 : 0.005 : 2) * 1e12;
-t = (-0.3 : 1e-4 : 1.5) * 1e-12;
+t = linspace(-2, 5, 7001) * 1e-12;
 % FEED GAP
 d_gap = 4.5 * 1e-6;
 % SLOT WIDTH
@@ -24,11 +28,8 @@ Vb = 30;
 % OPTICAL POWER
 P = 5 * 1e-3;
 % POINTS ALONG SLOT
-dx = d_gap;
-% x  = (- 405 * 1e-6 : dx : 405 * 1e-6);
-x  = (- 202.5 * 1e-6 : dx : 202.5 * 1e-6);
-% dx = 1 * 1e-6;
-% x  = (- 50 * 1e-6 : dx : 50 * 1e-6);
+dx = 1 * 1e-6;
+x  = (- 400 * 1e-6 : dx : 400 * 1e-6);
 % NUMBER OF POINTS
 Nf = length(f);
 Nt = length(t);
@@ -130,16 +131,14 @@ for x_idx = 1 : 1 : Nx
 end
 
 %% MUTUAL IMPEDANCE, ADMITTANCE, AND WEIGHT PLOTS
-x_idx    = [46, 68, 90];
-% x_idx    = [51, 101];
 Position = [680 558 650 370];
 
 % Frequency-domain plots
-Zm_plt = NaN(length(x_idx), Nf);
-Legend = cell(1, length(x_idx));
-for idx = 1 : 1 : length(x_idx)
-    Zm_plt(idx, :) = Zm(x_idx(idx), :);
-    Legend(idx)    = cellstr(['x = ' num2str(x(x_idx(idx)) * 1e6) ' \mum']);
+Zm_plt = NaN(length(x_plt), Nf);
+Legend = cell(1, length(x_plt));
+for idx = 1 : 1 : length(x_plt)
+    Zm_plt(idx, :) = Zm(x_plt(idx), :);
+    Legend(idx)    = cellstr(['x = ' num2str(x(x_plt(idx)) * 1e6) ' \mum']);
 end
 Gx_plt = 1 ./ Zm_plt;
 
@@ -149,13 +148,13 @@ plot_many(f * 1e-12, real(Zm_plt), Legend, 'f [THz]', 'Z_{x} [\Omega]', Title, X
 plot_many(f * 1e-12, real(Gx_plt), Legend, 'f [THz]', 'G_{x} [S]', Title, XLim, Position);
 
 % Time-domain plots
-gx_plt = NaN(length(x_idx), Nt);
+gx_plt = NaN(length(x_plt), Nt);
 zx_plt = gx_plt;
 h_plt  = gx_plt;
-for idx = 1 : 1 : length(x_idx)
-    gx_plt(idx, :) = gx(x_idx(idx), :);
-    zx_plt(idx, :) = zx(x_idx(idx), :);
-    h_plt(idx, :)  = h(x_idx(idx), :);
+for idx = 1 : 1 : length(x_plt)
+    gx_plt(idx, :) = gx(x_plt(idx), :);
+    zx_plt(idx, :) = zx(x_plt(idx), :);
+    h_plt(idx, :)  = h(x_plt(idx), :);
 end
 
 XLim   = [min(t_ga) max(t_ga)] * 1e12;
@@ -174,15 +173,13 @@ LineLegend = ["w/ weight", "w/o weight"];
 YLabel     = 'v_{x} [V]';
 Position   = [680 558 700 420];
 
-% t_idx = [827 1001 1201 1601 2001];
-t_idx = [3650 8001 13001];
-vx_plt      = NaN(length(t_idx), Nx);
+vx_plt      = NaN(length(t_plt), Nx);
 vx_zm_plt   = vx_plt;
-ColorLegend = cell(1, length(t_idx));
-for idx = 1 : 1 : length(t_idx)
-    vx_plt(idx, :)    = vx(:, t_idx(idx))';
-    vx_zm_plt(idx, :) = vx_zm(:, t_idx(idx))';
-    ColorLegend(idx)  = cellstr(['t = ' num2str(t(t_idx(idx)) * 1e12) ' ps']);
+ColorLegend = cell(1, length(t_plt));
+for idx = 1 : 1 : length(t_plt)
+    vx_plt(idx, :)    = vx(:, t_plt(idx))';
+    vx_zm_plt(idx, :) = vx_zm(:, t_plt(idx))';
+    ColorLegend(idx)  = cellstr(['t = ' num2str(t(t_plt(idx)) * 1e12) ' ps']);
 end
 
 XLim   = [-200 200];
@@ -191,15 +188,13 @@ plot_comparison(x * 1e6, vx_plt, vx_zm_plt, ColorLegend, LineLegend, 'YLabel', Y
                 'Title', Title, 'XLim', XLim, 'Position', Position);
 grid on;
 
-x_idx = [46, 68, 90];
-% x_idx = [51, 101];
-vx_plt      = NaN(length(x_idx), Nt);
+vx_plt      = NaN(length(x_plt), Nt);
 vx_zm_plt   = vx_plt;
-ColorLegend = cell(1, length(x_idx));
-for idx = 1 : 1 : length(x_idx)
-    vx_plt(idx, :)    = vx(x_idx(idx), :);
-    vx_zm_plt(idx, :) = vx_zm(x_idx(idx), :);
-    ColorLegend(idx)  = cellstr(['x = ' num2str(x(x_idx(idx)) * 1e6) ' \mum']);
+ColorLegend = cell(1, length(x_plt));
+for idx = 1 : 1 : length(x_plt)
+    vx_plt(idx, :)    = vx(x_plt(idx), :);
+    vx_zm_plt(idx, :) = vx_zm(x_plt(idx), :);
+    ColorLegend(idx)  = cellstr(['x = ' num2str(x(x_plt(idx)) * 1e6) ' \mum']);
 end
 
 XLim   = [-0.5 5];
