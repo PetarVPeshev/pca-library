@@ -17,6 +17,8 @@ er_dn = 1;     % medium 1
 dx = 0.5 * 1e-6;
 x  = linspace(0, 10, 101) * 1e-6;
 xq = [0.5 1 2] * 1e-6;
+% INTEGRATION DOMAIN
+C = 100;
 % NUMBER OF POINTS
 Nf = length(f);
 Nx = length(x);
@@ -25,29 +27,28 @@ Nx = length(x);
 slot = SlotInDielectrics(d_gap, ws, er_up, er_dn);
 
 %% FREQUENCY DOMAIN
-Zx_full  = NaN(Nx, Nf);
-Zx_path3 = Zx_full;
+Zx_1000k0  = NaN(Nx, Nf);
+Zx_Ck0 = Zx_1000k0;
 for f_idx = 1 : 1 : Nf
-    Zx_full(:, f_idx)  = evaluate_Zx(x, f(f_idx), slot, dx);
-    Zx_path3(:, f_idx) = evaluate_Zx_path3(x, f(f_idx), slot, dx);
+    Zx_1000k0(:, f_idx) = evaluate_Zx(x, f(f_idx), slot, dx);
+    Zx_Ck0(:, f_idx)    = evaluate_Zx_Ck0(x, f(f_idx), slot, dx, C);
 end
 
 xq_idx   = find(ismember(x, xq));
 Position = [680 558 750 400];
+YLim   = [0 80];
 
 % REAL PART
-YLim   = [0 80];
 YLabel = '\Re\{Z_{x}\} [\Omega]';
 Title  = ['\Re @ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' mum, d_{x} = ' ...
           num2str(dx * 1e6) ' \mum'];
-plot_comparison(f, real(Zx_full), real(Zx_path3), x, xq_idx, Position, YLim, YLabel, Title, true);
+plot_comparison(f, real(Zx_1000k0), real(Zx_Ck0), x, xq_idx, Position, YLim, YLabel, Title, true, C);
 
 % IMAG PART
-YLim   = [0 120];
 YLabel = '\Im\{Z_{x}\} [\Omega]';
 Title  = ['\Im @ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' mum, d_{x} = ' ...
           num2str(dx * 1e6) ' \mum'];
-plot_comparison(f, imag(Zx_full), imag(Zx_path3), x, xq_idx, Position, YLim, YLabel, Title, false);
+plot_comparison(f, imag(Zx_1000k0), imag(Zx_Ck0), x, xq_idx, Position, YLim, YLabel, Title, false, C);
 
 %% FUNCTIONS
 function Zx = evaluate_Zx(x, f, slot, dx)
@@ -71,83 +72,28 @@ function Zx = evaluate_Zx(x, f, slot, dx)
     end
 end
 
-function Zx = evaluate_Zx_path3(x, f, slot, dx)
+function Zx = evaluate_Zx_Ck0(x, f, slot, dx, C)
     c0 = get_phys_const('LightSpeed');
     k0 = 2 * pi * f / c0;
 
     Nx = length(x);
 
-    D_tt = @(kx) slot.compute_D(kx, f, 'TopSheet');
-    D_tb = @(kx) slot.compute_D(kx, f, 'BottomSheet');
-    D_bb = @(kx) compute_Dbb(slot, kx, f);
-    F    = @(kx) sinc(kx * slot.d_gap / (2 * pi));
-    Fx   = @(kx) sinc(- kx * dx / (2 * pi));
+    D  = @(kx) slot.compute_D(kx, f, 'TopSheet');
+    F  = @(kx) sinc(kx * slot.d_gap / (2 * pi));
+    Fx = @(kx) sinc(- kx * dx / (2 * pi));
 
     Zx = NaN(1, Nx);
     for x_idx = 1 : 1 : Nx
-        if x(x_idx) == 0
-            start_pt = - (1000 * k0 + 1j * 0.01);
-            end_pt = - start_pt;
-            waypts = [-(1 + 1j) (1 + 1j)] * 0.01;
+        start_pt = - (C * k0 + 1j * 0.01);
+        end_pt   = - start_pt;
+        waypts   = [-(1 + 1j) (1 + 1j)] * 0.01;
 
-            integrand = @(kx) F(kx) .* Fx(kx) ./ D_tt(kx);
-            Zx(x_idx) = integral(integrand, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-        else
-            k2 = k0 * sqrt(slot.er_up);
-            kxp = slot.find_kxp(f);
-
-            integrand_tt = @(kx) F(kx) .* Fx(kx) .* exp(- 1j * kx * abs(x(x_idx))) ./ D_tt(kx);
-            integrand_tb = @(kx) F(kx) .* Fx(kx) .* exp(- 1j * kx * abs(x(x_idx))) ./ D_tb(kx);
-            integrand_bb = @(kx) F(kx) .* Fx(kx) .* exp(- 1j * kx * abs(x(x_idx))) ./ D_bb(kx);
-
-            %% integration path 3
-            % Bottom-Bottom sheet integral
-            start_pt = k0 - 0.01 - 1j * 50 * k0;
-            end_pt = k0 - 0.01;
-            int_p1 = integral(integrand_bb, start_pt, end_pt) / (2 * pi);
-
-            % Top-Top sheet integral 1
-            start_pt = k0 - 0.01;
-            end_pt = k0 + 0.01;
-            waypts = [(k0 - 0.01 + 1j * 0.01) (k0 + 0.01 + 1j * 0.01)];
-            int_p2 = integral(integrand_tt, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-
-            % Top-Bottom sheet integral
-            start_pt = k0 + 0.01;
-            end_pt = k2 - 0.01;
-            waypts = [(k0 + 0.01 - 1j * 50 * k0) (k2 - 0.01 - 1j * 50 * k0) ...
-                      (k2 - 0.01 + 1j * (imag(kxp) - 1)) (real(kxp) - 1 + 1j * (imag(kxp) - 1)) ...
-                      (real(kxp) - 1 + 1j * (imag(kxp) + 1)) (k2 - 0.01 + 1j * (imag(kxp) + 1))];
-            int_p3 = integral(integrand_tb, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-
-            % Top-Top sheet integral 2
-            start_pt = k2 - 0.01;
-            end_pt = k2 + 0.01 - 1j * 50 * k0;
-            waypts = [(k2 - 0.01 + 1j * 0.01) (k2 + 0.01 + 1j * 0.01)];
-            int_p4 = integral(integrand_tt, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-
-            Zx(x_idx) = int_p1 + int_p2 + int_p3 + int_p4;
-        end
+        integrand = @(kx) F(kx) .* Fx(kx) .* exp(- 1j * kx * abs(x(x_idx))) ./ D(kx);
+        Zx(x_idx) = integral(integrand, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
     end
 end
 
-function D = compute_Dbb(slot, kx, f)
-    c0 = get_phys_const('LightSpeed');
-    eta0 = get_phys_const('VacuumImpedance');
-    
-    k0 = 2 * pi * f / c0;
-    k1 = k0 * sqrt(slot.er_dn);
-    k2 = k0 * sqrt(slot.er_up);
-
-    % Solution in bottom-bottom Riemann sheet
-    K1 = 1j * sqrt(- k1 ^ 2 + kx .^ 2);
-    K2 = 1j * sqrt(- k2 ^ 2 + kx .^ 2);
-
-    D = (K1 .^ 2) .* compute_J0H02(K1 * slot.ws / 4) + (K2 .^ 2) .* compute_J0H02(K2 * slot.ws / 4);
-    D = D / (2 * k0 * eta0);
-end
-
-function fig = plot_comparison(f, y1, y2, x, xq_idx, Position, YLim, YLabel, Title, zoom_axes)
+function fig = plot_comparison(f, y1, y2, x, xq_idx, Position, YLim, YLabel, Title, zoom_axes, C)
     Color = ["#0072BD", "#D95319", "#EDB120", "#7E2F8E", "#77AC30", "#4DBEEE", "#A2142F"];
     Nf    = length(f);
 
@@ -181,7 +127,7 @@ function fig = plot_comparison(f, y1, y2, x, xq_idx, Position, YLim, YLabel, Tit
     H2 = plot(NaN, '--+', 'LineWidth', 1.5, 'Color', [0 0 0], 'Parent', AX2);
     
     set(AX2, 'Color', 'none', 'XTick', [], 'Visible', 'off');
-    LGND2 = legend([H1 H2], {'FULL', 'AROUND CUTS'}, 'location', 'bestoutside');
+    LGND2 = legend([H1 H2], {'1000k_{0}', [num2str(C) 'k_{0}']}, 'location', 'bestoutside');
     LGND2.Position(1) = LGND1.Position(1);
     LGND2.Position(2) = LGND1.Position(2) - LGND2.Position(4) - 0.02;
     LGND2.Box   = 'off';

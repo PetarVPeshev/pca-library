@@ -8,7 +8,7 @@ Position   = [680 558 700 420];
 LineLegend = {'Z_{x}', 'Res\{Z_{x}\}'};
 Location   = 'bestoutside';
 LineWidth  = 1.5;
-Color      = ["#0072BD", "#EDB120", "#7E2F8E", "#77AC30", "#A2142F"];
+Color      = ["#0072BD", "#D95319", "#EDB120", "#7E2F8E", "#77AC30"];
 
 %% PARAMETERS
 f = linspace(eps, 2, 4001) * 1e12;
@@ -22,7 +22,7 @@ er_up = 11.7;  % medium 2
 er_dn = 1;     % medium 1
 % SLOT POSITIONS
 dx = d_gap;
-x = [4.5 100 200 300] * 1e-6;
+x = [0.5 1 2] * 1e-6;
 % NUMBER OF POINTS
 Nf = length(f);
 Nt = length(t);
@@ -63,11 +63,11 @@ plot_two(f * 1e-12, imag(Zx), imag(Zx_res), 'ColorLegend', ColorLegend, 'LineLeg
 grid on;
 
 %% TIME DOMAIN
-zx = NaN(Nx - 1, Nt);
+zx = NaN(Nx, Nt);
 zx_res = zx;
-for x_idx = 1 : 1 : Nx - 1
-    zx(x_idx, :) = 2 * real(eval_IFT(t, f, Zx(x_idx + 1, :)));
-    zx_res(x_idx, :) = 2 * real(eval_IFT(t, f, Zx_res(x_idx + 1, :)));
+for x_idx = 1 : 1 : Nx
+    zx(x_idx, :) = 2 * real(eval_IFT(t, f, Zx(x_idx, :)));
+    zx_res(x_idx, :) = 2 * real(eval_IFT(t, f, Zx_res(x_idx, :)));
 end
 
 Title = ['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
@@ -75,10 +75,29 @@ Title = ['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) 
 YLabel = 'z_{x} [\Omega]';
 XLabel = 't [ps]';
 
-plot_two(t * 1e12, zx, zx_res, 'ColorLegend', ColorLegend(2 : Nx), 'LineLegend', LineLegend, ...
-    'ColorLocation', Location, 'LineLocation', Location, 'LineWidth', LineWidth, 'Color', ...
-    Color(2 : Nx), 'XLabel', XLabel, 'YLabel', YLabel, 'Title', Title, 'Position', Position);
+fig = plot_two(t * 1e12, zx, zx_res, 'ColorLegend', ColorLegend, 'LineLegend', LineLegend, ...
+               'ColorLocation', Location, 'LineLocation', Location, 'LineWidth', LineWidth, 'Color', ...
+                Color, 'XLabel', XLabel, 'YLabel', YLabel, 'Title', Title, 'Position', Position);
 grid on;
+xlim([-1 3]);
+
+% ZOOM AXES
+AX3 = axes('Position', [0.375 0.555 0.35 0.35], 'Box', 'off', 'Parent', fig);
+for x_idx = 1 : 1 : Nx
+    t_idx = t * 1e12 >= -0.2 & t * 1e12 <= 0.05;
+
+    plot(t(t_idx) * 1e12, zx(x_idx, t_idx), 'LineWidth', LineWidth, ...
+         'Color', Color(x_idx), 'Parent', AX3);
+    hold on;
+    plot(t(t_idx) * 1e12, zx_res(x_idx, t_idx), '--', 'LineWidth', LineWidth, ...
+         'Color', Color(x_idx), 'Parent', AX3);
+    hold on;
+end
+
+hold off;
+grid on;
+annotation('rectangle', [0.175 0.74 0.15 0.17], 'LineWidth', 0.75);
+xlim([-0.2 0.05]);
 
 %% FUNCTIONS
 function Zx = evaluate_Zx(x, f, slot, dx)
