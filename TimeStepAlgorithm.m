@@ -98,6 +98,12 @@ classdef TimeStepAlgorithm < matlab.System
 
                 % Compute gap current at m
                 im = obj.compute_im(obj.i_prev, vgm, Fsm_m, obj.alpha);
+                if im < 0
+                    im = 0;
+                end
+                if im > obj.i_impr(obj.m)
+                    im = obj.i_impr(obj.m);
+                end
                 obj.i_prev = im;
 
                 % Compute internal current at m

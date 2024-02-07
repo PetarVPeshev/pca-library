@@ -1,4 +1,4 @@
-% close all;
+close all;
 clear;
 clc;
 
@@ -14,7 +14,7 @@ config_pcm   = struct('wz', 2 * 1e-6, 'er', 12.96, 'tau_rec', 300 * 1e-15, 'tau_
 t_plt = [2066 2501 3001 4001 5001];
 
 % Plot x indecies
-x_plt = [401 501 601 701];
+x_plt = [801 1001 1201 1401];  % [401 501 601 701];
 
 %% PARAMETERS
 f = (0.05 : 0.005 : 2) * 1e12;
@@ -28,7 +28,7 @@ Vb = 30;
 % OPTICAL POWER
 P = 5 * 1e-3;
 % POINTS ALONG SLOT
-dx = 1 * 1e-6;
+dx = 0.5 * 1e-6;
 x  = (- 400 * 1e-6 : dx : 400 * 1e-6);
 % NUMBER OF POINTS
 Nf = length(f);
@@ -210,120 +210,19 @@ function Zx = evaluate_Zx(x, f, slot, dx)
 
     Nx = length(x);
 
-    D_tt = @(kx) slot.compute_D(kx, f, 'TopSheet');
-    D_tb = @(kx) slot.compute_D(kx, f, 'BottomSheet');
-    D_bb = @(kx) compute_Dbb(slot, kx, f);
-    F = @(kx) sinc(kx * slot.d_gap / (2 * pi));
+    D  = @(kx) slot.compute_D(kx, f, 'TopSheet');
+    F  = @(kx) sinc(kx * slot.d_gap / (2 * pi));
     Fx = @(kx) sinc(- kx * dx / (2 * pi));
 
     Zx = NaN(1, Nx);
     for x_idx = 1 : 1 : Nx
-        if x(x_idx) == 0
-            start_pt = - (1000 * k0 + 1j * 0.01);
-            end_pt = - start_pt;
-            waypts = [-(1 + 1j) (1 + 1j)] * 0.01;
+        start_pt = - (100 * k0 + 1j * 0.01);
+        end_pt   = - start_pt;
+        waypts   = [-(1 + 1j) (1 + 1j)] * 0.01;
 
-            integrand = @(kx) F(kx) .* Fx(kx) ./ D_tt(kx);
-            Zx(x_idx) = integral(integrand, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-        else
-            k2 = k0 * sqrt(slot.er_up);
-            kxp = slot.find_kxp(f);
-
-            integrand_tt = @(kx) F(kx) .* Fx(kx) .* exp(- 1j * kx * abs(x(x_idx))) ./ D_tt(kx);
-            integrand_tb = @(kx) F(kx) .* Fx(kx) .* exp(- 1j * kx * abs(x(x_idx))) ./ D_tb(kx);
-            integrand_bb = @(kx) F(kx) .* Fx(kx) .* exp(- 1j * kx * abs(x(x_idx))) ./ D_bb(kx);
-
-            %% integration path 1
-%             % Top-Top sheet integral 1
-%             start_pt = - (0.01 + 1j * 50 * k0);
-%             end_pt = k0 + 0.01;
-%             waypts = [-(0.01 + 1j * 0.01) (0.01 + 1j * 0.01) (k0 + 1j * 0.01)];
-%             int_p1 = integral(integrand_tt, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-% 
-%             % Top-Bottom sheet
-%             start_pt = k0 + 0.01;
-%             end_pt = k2 - 0.01;
-%             waypts = [(k0 - 1j * 0.01) (0.01 - 1j * 0.01) (0.01 - 1j * 50 * k0) (k2 - 0.01 - 1j * 50 * k0) ...
-%                       (k2 - 0.01 + 1j * (imag(kxp) - 1)) (real(kxp) - 1 + 1j * (imag(kxp) - 1)) ...
-%                       (real(kxp) - 1 + 1j * (imag(kxp) + 1)) (k2 - 0.01 + 1j * (imag(kxp) + 1))];
-%             int_p2 = integral(integrand_tb, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-% 
-%             % Top-Top sheet integral 2
-%             start_pt = k2 - 0.01;
-%             end_pt = k2 + 0.01 - 1j * 50 * k0;
-%             waypts = [(k2 - 0.01 + 1j * 0.01) (k2 + 0.01 + 1j * 0.01)];
-%             int_p3 = integral(integrand_tt, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-% 
-%             Zx(x_idx) = int_p1 + int_p2 + int_p3;
-
-            %% integration path 2
-%             % Top-Top sheet integral 1
-%             start_pt = - (0.01 + 1j * 50 * k0);
-%             end_pt = k0 + 0.01;
-%             waypts = [-(0.01 + 1j * 0.01) (0.01 + 1j * 0.01) (k0 + 1j * 0.01)];
-%             int_p1 = integral(integrand_tt, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-% 
-%             % Top-Bottom sheet
-%             start_pt = k0 + 0.01;
-%             end_pt = k2 - 0.01;
-%             waypts = [(k0 + 0.01 - 1j * 50 * k0) (k2 - 0.01 - 1j * 50 * k0) ...
-%                       (k2 - 0.01 + 1j * (imag(kxp) - 1)) (real(kxp) - 1 + 1j * (imag(kxp) - 1)) ...
-%                       (real(kxp) - 1 + 1j * (imag(kxp) + 1)) (k2 - 0.01 + 1j * (imag(kxp) + 1))];
-%             int_p2 = integral(integrand_tb, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-% 
-%             % Top-Top sheet integral 2
-%             start_pt = k2 - 0.01;
-%             end_pt = k2 + 0.01 - 1j * 50 * k0;
-%             waypts = [(k2 - 0.01 + 1j * 0.01) (k2 + 0.01 + 1j * 0.01)];
-%             int_p3 = integral(integrand_tt, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-% 
-%             Zx(x_idx) = int_p1 + int_p2 + int_p3;
-
-            %% integration path 3
-            % Bottom-Bottom sheet integral
-            start_pt = k0 - 0.01 - 1j * 50 * k0;
-            end_pt = k0 - 0.01;
-            int_p1 = integral(integrand_bb, start_pt, end_pt) / (2 * pi);
-
-            % Top-Top sheet integral 1
-            start_pt = k0 - 0.01;
-            end_pt = k0 + 0.01;
-            waypts = [(k0 - 0.01 + 1j * 0.01) (k0 + 0.01 + 1j * 0.01)];
-            int_p2 = integral(integrand_tt, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-
-            % Top-Bottom sheet integral
-            start_pt = k0 + 0.01;
-            end_pt = k2 - 0.01;
-            waypts = [(k0 + 0.01 - 1j * 50 * k0) (k2 - 0.01 - 1j * 50 * k0) ...
-                      (k2 - 0.01 + 1j * (imag(kxp) - 1)) (real(kxp) - 1 + 1j * (imag(kxp) - 1)) ...
-                      (real(kxp) - 1 + 1j * (imag(kxp) + 1)) (k2 - 0.01 + 1j * (imag(kxp) + 1))];
-            int_p3 = integral(integrand_tb, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-
-            % Top-Top sheet integral 2
-            start_pt = k2 - 0.01;
-            end_pt = k2 + 0.01 - 1j * 50 * k0;
-            waypts = [(k2 - 0.01 + 1j * 0.01) (k2 + 0.01 + 1j * 0.01)];
-            int_p4 = integral(integrand_tt, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
-
-            Zx(x_idx) = int_p1 + int_p2 + int_p3 + int_p4;
-        end
+        integrand = @(kx) F(kx) .* Fx(kx) .* exp(- 1j * kx * abs(x(x_idx))) ./ D(kx);
+        Zx(x_idx) = integral(integrand, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
     end
-end
-
-function D = compute_Dbb(slot, kx, f)
-    c0 = get_phys_const('LightSpeed');
-    eta0 = get_phys_const('VacuumImpedance');
-    
-    k0 = 2 * pi * f / c0;
-    k1 = k0 * sqrt(slot.er_dn);
-    k2 = k0 * sqrt(slot.er_up);
-
-    % Solution in bottom-bottom Riemann sheet
-    K1 = 1j * sqrt(- k1 ^ 2 + kx .^ 2);
-    K2 = 1j * sqrt(- k2 ^ 2 + kx .^ 2);
-
-    D = (K1 .^ 2) .* compute_J0H02(K1 * slot.ws / 4) + (K2 .^ 2) .* compute_J0H02(K2 * slot.ws / 4);
-    D = D / (2 * k0 * eta0);
 end
 
 function y = eval_IFT(t, f, Y)
@@ -333,22 +232,6 @@ function y = eval_IFT(t, f, Y)
     [F, T] = meshgrid(f, t);
     Y = repmat(Y, Nt, 1);
     y = sum(Y .* exp(1j .* 2 .* pi .* F .* T), 2)' * df;
-end
-
-function vx = evaluate_vx(dt, i, gm)
-    % row - x, col - t
-    Nt  = length(i);
-    den = dt * gm(:, 1);
-    vx  = NaN(size(gm));
-    
-    % First time index
-    vx(:, 1) = i(1) ./ den;
-    
-    % All other time indecies
-    for m = 2 : 1 : Nt
-        conv_part = dt * sum(vx(:, 1 : m - 1) .* fliplr(gm(:, 2 : m)), 2);
-        vx(:, m)  = (i(m) - conv_part) ./ den;
-    end
 end
 
 function vx = evaluate_vx_weight(i, h, w)
@@ -363,7 +246,7 @@ function vx = evaluate_vx_weight(i, h, w)
     for m = 2 : 1 : Nt
         conv_part_1 = sum(i(:, 1 : m) .* fliplr(h(:, 1 : m)), 2);
         conv_part_2 = sum(vx(:, 1 : m - 1) .* fliplr(w(:, 2 : m)), 2);
-        vx(:, m)  = (conv_part_1 - conv_part_2) ./ w(:, 1);
+        vx(:, m)    = (conv_part_1 - conv_part_2) ./ w(:, 1);
     end
 end
 

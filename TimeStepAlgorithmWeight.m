@@ -102,6 +102,12 @@ classdef TimeStepAlgorithmWeight < matlab.System
 
                 % Compute transient current at m
                 im_int = obj.compute_im_int(obj.i_int_prev, vm, Fsm_m, obj.alpha);
+                if im_int < 0
+                    im_int = 0;
+                end
+                if im_int > obj.i_impr(obj.m)
+                    im_int = obj.i_impr(obj.m);
+                end
                 obj.i_int_prev = im_int;
                 obj.i_int(obj.m) = im_int;
 

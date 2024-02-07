@@ -21,7 +21,7 @@ ws = 10 * 1e-6;
 er_up = 11.7;  % medium 2
 er_dn = 1;     % medium 1
 % SLOT POSITIONS
-dx = d_gap;
+dx = 0.5 * 1e-6;
 x = [0.5 1 2] * 1e-6;
 % NUMBER OF POINTS
 Nf = length(f);
@@ -112,7 +112,7 @@ function Zx = evaluate_Zx(x, f, slot, dx)
 
     Zx = NaN(1, Nx);
     for x_idx = 1 : 1 : Nx
-        start_pt = - (1000 * k0 + 1j * 0.01);
+        start_pt = - (100 * k0 + 1j * 0.01);
         end_pt   = - start_pt;
         waypts   = [-(1 + 1j) (1 + 1j)] * 0.01;
 
