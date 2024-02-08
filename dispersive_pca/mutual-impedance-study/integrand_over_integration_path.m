@@ -78,8 +78,8 @@ for f_idx = 1 : 1 : Nf
         
         legend([INT_PATH POLE], 'location', 'bestoutside');
         
-        xlabel('\Re');
-        ylabel('\Im');
+        xlabel('\Re\{ k_{x} / k_{0} \}');
+        ylabel('\Im\{ k_{x} / k_{0} \}');
     
         [magn_symb, magn_order] = find_magnitude(f(f_idx));
         title("Normalized |Z_{x}'(k_{x})| @ x = " + num2str(x(x_idx) * 1e6) + " \mum, f = " ...
