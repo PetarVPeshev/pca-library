@@ -1,6 +1,7 @@
 classdef SlotSemiFinite < SlotABC
     %SLOTSEMIFINITE Summary of this class goes here
     %   Detailed explanation goes here
+    % FIXME: This class requires refactoring; the class should not work following the SlotABC refactoring 
     
     properties (SetAccess = immutable)
         d_gap   (1,1) double

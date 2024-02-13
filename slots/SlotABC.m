@@ -11,8 +11,8 @@ classdef (Abstract) SlotABC < handle
     methods (Abstract)
         kxp    = get_kxp_init_guess(obj, k0)
         D      = compute_D(obj, kx, k0, sheet_k1, sheet_k2)
-        v      = compute_v_int(obj, x, k0)
-        z      = compute_z_int(obj, k0)
+        v_int  = compute_v_int(obj, kx, x, k0)
+        z_int  = compute_z_int(obj, kx, k0)
         kx_max = get_integration_domain(obj, f, N)
     end
     
@@ -76,18 +76,21 @@ classdef (Abstract) SlotABC < handle
             Nf = length(f);
             Nx = length(x);
 
-            k0         = 2 * pi * f / c0;
-            kx_max     = obj.get_integration_domain(f, obj.N);
-            integrands = obj.compute_v_int(x, k0);
+            k0     = 2 * pi * f / c0;
+            kx_max = obj.get_integration_domain(f, obj.N);
+            v_int  = @(kx, k0, x) obj.compute_v_int(kx, x, k0);
 
             v = NaN(Nf, Nx);
             for f_idx = 1 : Nf
                 start_pt = - (kx_max(f_idx) * k0(f_idx) + 1j * 0.01);
                 end_pt   = - start_pt;
                 waypts   = [-(1 + 1j) (1 + 1j)] * 0.01;
+
+                vx_int = @(kx, x) v_int(kx, k0(f_idx), x);
     
                 parfor idx = 1 : Nx
-                    v(f_idx, idx) = integral(integrands{f_idx, idx}, start_pt, end_pt, 'Waypoints', waypts);
+                    integrand     = @(kx) vx_int(kx, x(idx));
+                    v(f_idx, idx) = integral(integrand, start_pt, end_pt, 'Waypoints', waypts);
                 end
             end
 
@@ -105,18 +108,21 @@ classdef (Abstract) SlotABC < handle
             c0 = get_phys_const('LightSpeed');
             Nf = length(f);
 
-            k0         = 2 * pi * f / c0;
-            kx_max     = obj.get_integration_domain(f, obj.N);
-            integrands = obj.compute_z_int(k0);
+            k0     = 2 * pi * f / c0;
+            kx_max = obj.get_integration_domain(f, obj.N);
+            z_int  = @(kx, k0) obj.compute_z_int(kx, k0);
 
             zin = NaN(1, Nf);
             parfor idx = 1 : Nf
                 start_pt = - (kx_max(idx) * k0(idx) + 1j * 0.01);
                 end_pt   = - start_pt;
                 waypts   = [-(1 + 1j) (1 + 1j)] * 0.01;
-    
-                zin(idx) = integral(integrands{idx}, start_pt, end_pt, 'Waypoints', waypts) / (2 * pi);
+
+                integrand = @(kx) z_int(kx, k0(idx));
+                zin(idx)  = integral(integrand, start_pt, end_pt, 'Waypoints', waypts);
             end
+
+            zin = zin / (2 * pi);
         end
     end
 end

@@ -75,36 +75,20 @@ classdef SlotInDielectrics < SlotABC
             D = D / (2 * k0 * eta0);
         end
 
-        function v = compute_v_int(obj, x, k0)
+        function v_int = compute_v_int(obj, kx, x, k0)
             %COMPUTE_V_INT Summary of this method goes here
             %   Detailed explanation goes here
-            Nx  = length(x);
-            Nk0 = length(k0);
-
-            feed = @(kx) sinc(kx * obj.d_gap / (2* pi));
-
-            v = cell(Nk0, Nx);
-            for k0_idx = 1 : Nk0
-                D = @(kx) obj.compute_D(kx, k0(k0_idx), 'Top', 'Top');
-
-                for x_idx = 1 : Nx
-                    v{k0_idx, x_idx} = @(kx) feed(kx) .* exp(- 1j * kx * x(x_idx)) ./ D(kx);
-                end
-            end
+            feed  = sinc(kx * obj.d_gap / (2 * pi));
+            D     = obj.compute_D(kx, k0, 'Top', 'Top');
+            v_int = feed .* exp(- 1j * kx * x) ./ D;
         end
 
-        function z = compute_z_int(obj, k0)
+        function z_int = compute_z_int(obj, kx, k0)
             %COMPUTE_Z_INT Summary of this method goes here
             %   Detailed explanation goes here
-            Nk0 = length(k0);
-
-            feed = @(kx) sinc(kx * obj.d_gap / (2* pi));
-
-            z = cell(1, Nk0);
-            for idx = 1 : Nk0
-                D = @(kx) obj.compute_D(kx, k0(idx), 'Top', 'Top');
-                z{idx} = @(kx) (feed(kx) .^ 2) ./ D(kx);
-            end
+            feed  = sinc(kx * obj.d_gap / (2 * pi));
+            D     = obj.compute_D(kx, k0, 'Top', 'Top');
+            z_int = (feed .^ 2) ./ D;
         end
 
         function kx_max = get_integration_domain(obj, f, N)

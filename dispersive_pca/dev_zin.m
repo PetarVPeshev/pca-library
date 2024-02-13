@@ -30,14 +30,12 @@ slot = SlotInDielectrics(d_gap, ws, er_up, er_dn);
 Zin         = NaN(length(ws_vec), length(f));
 ColorLegend = cell(1, 4);
 
-tic;
 for ws_idx = 1 : length(ws_vec)
     slot.ws        = ws_vec(ws_idx);
     Zin(ws_idx, :) = slot.compute_zin(f);
 
     ColorLegend(ws_idx) = cellstr( ['w_{y} = ' num2str(ws_vec(ws_idx) * 1e6) ' \mum'] );
 end
-toc
 
 XLabel = 'f [THz]';
 YLabel = 'z_{in} [\Omega]';
@@ -56,14 +54,12 @@ slot.ws = ws;
 Zin         = NaN(length(d_gap_vec), length(f));
 ColorLegend = cell(1, 4);
 
-tic;
 for d_gap_idx = 1 : length(d_gap_vec)
     slot.d_gap        = d_gap_vec(d_gap_idx);
     Zin(d_gap_idx, :) = slot.compute_zin(f);
 
     ColorLegend(d_gap_idx) = cellstr( ['\Delta = ' num2str(d_gap_vec(d_gap_idx) * 1e6) ' \mum'] );
 end
-toc
 
 XLabel = 'f [THz]';
 YLabel = 'z_{in} [\Omega]';
