@@ -22,20 +22,22 @@ ws_vec = (10 : - 2.5 : 2.5) * 1e-6;
 er_up = 11.7;  % medium 2
 er_dn = 1;     % medium 1
 
+%% OBJECTS
+slot = SlotInDielectrics(d_gap, ws, er_up, er_dn);
+
 %% INPUT IMPEDANCE OF INFINITE SLOT
 % FOR DIFFERENT SLOT WIDTHS
-Zin = NaN(length(ws_vec), length(f));
+Zin         = NaN(length(ws_vec), length(f));
 ColorLegend = cell(1, 4);
 
-for ws_idx = 1 : 1 : length(ws_vec)
-    slot = SlotInDielectrics(d_gap, ws_vec(ws_idx), er_up, er_dn);
-
-    for f_idx = 1 : 1 : length(f)
-        Zin(ws_idx, f_idx) = slot.compute_zin(f(f_idx));
-    end
+tic;
+for ws_idx = 1 : length(ws_vec)
+    slot.ws        = ws_vec(ws_idx);
+    Zin(ws_idx, :) = slot.compute_zin(f);
 
     ColorLegend(ws_idx) = cellstr( ['w_{y} = ' num2str(ws_vec(ws_idx) * 1e6) ' \mum'] );
 end
+toc
 
 XLabel = 'f [THz]';
 YLabel = 'z_{in} [\Omega]';
@@ -49,18 +51,19 @@ grid on;
 yticks(0 : 20 : 80);
 
 % FOR DIFFERENT FEED DELTA-GAPS
-Zin = NaN(length(d_gap_vec), length(f));
+slot.ws = ws;
+
+Zin         = NaN(length(d_gap_vec), length(f));
 ColorLegend = cell(1, 4);
 
-for d_gap_idx = 1 : 1 : length(d_gap_vec)
-    slot = SlotInDielectrics(d_gap_vec(d_gap_idx), ws, er_up, er_dn);
-
-    for f_idx = 1 : 1 : length(f)
-        Zin(d_gap_idx, f_idx) = slot.compute_zin(f(f_idx));
-    end
+tic;
+for d_gap_idx = 1 : length(d_gap_vec)
+    slot.d_gap        = d_gap_vec(d_gap_idx);
+    Zin(d_gap_idx, :) = slot.compute_zin(f);
 
     ColorLegend(d_gap_idx) = cellstr( ['\Delta = ' num2str(d_gap_vec(d_gap_idx) * 1e6) ' \mum'] );
 end
+toc
 
 XLabel = 'f [THz]';
 YLabel = 'z_{in} [\Omega]';
