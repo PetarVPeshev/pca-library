@@ -210,7 +210,7 @@ function Zx = evaluate_Zx(x, f, slot, dx)
 
     Nx = length(x);
 
-    D  = @(kx) slot.compute_D(kx, f, 'TopSheet');
+    D  = @(kx) slot.compute_D(kx, k0, 'Top', 'Top');
     F  = @(kx) sinc(kx * slot.d_gap / (2 * pi));
     Fx = @(kx) sinc(- kx * dx / (2 * pi));
 
