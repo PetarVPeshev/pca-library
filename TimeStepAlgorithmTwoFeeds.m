@@ -1,4 +1,4 @@
-classdef TimeStepAlgorithmParallel < matlab.System
+classdef TimeStepAlgorithmTwoFeeds < matlab.System
     % TimeStep Add summary here
     % Algorithm is defined as closely related to simulation time, for
     % different simulation time, new object must be constructed
@@ -12,7 +12,7 @@ classdef TimeStepAlgorithmParallel < matlab.System
     properties (Nontunable)
         K           (1,1) double
         Vb          (1,1) double
-        ga          (1,:) double
+        h           (2,2) cell
         w           (1,:) double
         tau_c       (1,1) double
         tau_s       (1,1) double
@@ -21,21 +21,21 @@ classdef TimeStepAlgorithmParallel < matlab.System
 
     properties (DiscreteState)
         m
-        i_int_prev
-        i_int
+        i
         v
         is_done
     end
 
     properties (SetAccess = protected)
+        w0          (2,2) double
+        h0          (2,2) double
         Fsm         (1,:) double
         i_impr      (1,:) double
-        v_impr      (1,:) double
         alpha       (1,1) double  % attenuation of current for one time step
     end
 
     methods
-        function obj = TimeStepAlgorithmParallel(t, params)
+        function obj = TimeStepAlgorithmTwoFeeds(t, params)
             % Support name-value pair arguments when constructing object
             %   t [t] Simulation time [s]
             %   K [K] Photo-conductive antenna constant [S/s^2]
@@ -50,7 +50,7 @@ classdef TimeStepAlgorithmParallel < matlab.System
                 t               (1,:) double
                 params.K        (1,1) double = 0
                 params.Vb       (1,1) double = 0
-                params.ga       (1,:) double = 0
+                params.h        (2,2) cell   = cell(2,2)
                 params.w        (1,:) double = 0
                 params.tau_c    (1,1) double = 0
                 params.tau_s    (1,1) double = 0
@@ -63,7 +63,7 @@ classdef TimeStepAlgorithmParallel < matlab.System
 
             obj.K       = params.K;
             obj.Vb      = params.Vb;
-            obj.ga      = params.ga;
+            obj.h       = params.h;
             obj.w       = params.w;
             obj.tau_c   = params.tau_c;
             obj.tau_s   = params.tau_s;
@@ -73,11 +73,12 @@ classdef TimeStepAlgorithmParallel < matlab.System
 
     methods(Access = protected)
         function setupImpl(obj)
-            % Perform one-time calculation of Fsm, and alpha
+            % Perform one-time calculation of Fsm, i_impr, and alpha
 
+            obj.w0     = eye(2) * obj.w(1);
+            obj.h0     = [obj.h{1,1}(1) obj.h{1,2}(1); obj.h{2,1}(1) obj.h{2,2}(1)];
             obj.Fsm    = obj.compute_Fsm(obj.t, obj.K, obj.sigma_t, obj.tau_c);
             obj.i_impr = obj.compute_i_impr(obj.t, obj.Vb, obj.K, obj.sigma_t, obj.tau_c, obj.tau_s);
-            obj.v_impr = obj.compute_v_impr(obj.i_impr, obj.ga);
             obj.alpha  = exp(- obj.dt / obj.tau_c) * exp(- obj.dt / obj.tau_s);
         end
 
@@ -91,21 +92,37 @@ classdef TimeStepAlgorithmParallel < matlab.System
             if ~obj.is_done
                 Fsm_m = obj.Fsm(obj.m);
 
-                % Compute transient voltage at m
-                vm = obj.compute_vm(obj.m, obj.v, obj.v_impr(obj.m), obj.i_int, obj.i_int_prev, obj.ga, ...
-                                    obj.w, Fsm_m, obj.alpha);
-                obj.v(obj.m) = vm;
+                if obj.m == 1
+                    Tm = [Fsm_m; Fsm_m] * obj.Vb;
+                    C  = [0 0; 0 0];
+                    Cv = [0; 0];
+                else
+                    Tm = obj.alpha * obj.i(:, obj.m - 1) + Fsm_m * obj.Vb;
 
-                % Compute total voltage at m
+                    C11 = sum(obj.i(1, 1 : obj.m - 1) .* fliplr(obj.h{1,1}(2 : obj.m)));
+                    C12 = sum(obj.i(2, 1 : obj.m - 1) .* fliplr(obj.h{1,2}(2 : obj.m)));
+                    C21 = sum(obj.i(1, 1 : obj.m - 1) .* fliplr(obj.h{2,1}(2 : obj.m)));
+                    C22 = sum(obj.i(2, 1 : obj.m - 1) .* fliplr(obj.h{2,2}(2 : obj.m)));
+                    C   = [C11 C12; C21 C22];
+
+                    Cv1 = sum(obj.v(1, 1 : obj.m - 1) .* fliplr(obj.w(2 : obj.m)));
+                    Cv2 = sum(obj.v(2, 1 : obj.m - 1) .* fliplr(obj.w(2 : obj.m)));
+                    Cv  = [Cv1; Cv2];
+                end
+                
+                % Compute transient voltage at m
+                vm           = obj.compute_vm(obj.w0, Fsm_m, obj.h0, Tm, C, Cv);
+                obj.v(:, obj.m) = vm;
+
+                % Compute gap voltage at m
                 vgm = obj.Vb - vm;
 
-                % Compute transient current at m
-                im_int = obj.compute_im_int(obj.i_int_prev, vm, Fsm_m, obj.alpha);
-                obj.i_int_prev = im_int;
-                obj.i_int(obj.m) = im_int;
+                % Compute radiating current at m
+                im           = obj.compute_im(vm, Tm, Fsm_m);
+                obj.i(:, obj.m) = im;
 
-                % Compute total current at m
-                im = obj.i_impr(obj.m) - im_int;
+                % Compute internal current at m
+                im_int = obj.i_impr(obj.m) - im;
 
                 % Set is_done flag
                 obj.is_done = obj.m == obj.m_max;
@@ -118,20 +135,20 @@ classdef TimeStepAlgorithmParallel < matlab.System
             % Initialize / reset time idex to 0, initial current at 0 A, allocated space for current vector, 
             % and set is_done flag to false
 
-            obj.m           = 0;
-            obj.i_int_prev  = 0;
-            obj.i_int       = NaN(1, obj.m_max);
-            obj.v           = NaN(1, obj.m_max);
-            obj.is_done     = false;
+            obj.m       = 0;
+            obj.i       = NaN(2, obj.m_max);
+            obj.v       = NaN(2, obj.m_max);
+            obj.is_done = false;
         end
 
         function releaseImpl(obj)
             % Release Fsm, impressed current (set to double empty row vector), and step attenuation (set to 
             % empty matrix)
 
+            obj.w0     = 0;
+            obj.h0     = 0;
             obj.Fsm    = double.empty(1, 0);
             obj.i_impr = double.empty(1, 0);
-            obj.v_impr = double.empty(1, 0);
             obj.alpha  = 0;
         end
 
@@ -144,22 +161,22 @@ classdef TimeStepAlgorithmParallel < matlab.System
             obj.check_general_property(obj.tau_s, 'tau_s');
             obj.check_general_property(obj.sigma_t, 'sigma_t');
 
-            if length(obj.ga) ~= obj.m_max
-                error('TimeStepWeight:ga:invalidSize', ['Antenna impulse response admittance must be ' ...
-                    'same length as t.']);
-            end
-
-            if any(isnan(obj.ga))
-                error('TimeStepWeight:ga:NaN', 'Antenna impulse response admittance contains NaN values.');
-            end
-
-            if length(obj.w) ~= obj.m_max
-                error('TimeStepWeight:w:invalidSize', 'Weight function must be same length as t.');
-            end
-
-            if any(isnan(obj.w))
-                error('TimeStepWeight:w:NaN', 'Weight function contains NaN values.');
-            end
+%             if length(obj.h) ~= obj.m_max
+%                 error('TimeStepWeight:ga:invalidSize', ['Antenna impulse response admittance must be ' ...
+%                     'same length as t.']);
+%             end
+% 
+%             if any(isnan(obj.h))
+%                 error('TimeStepWeight:ga:NaN', 'Antenna impulse response admittance contains NaN values.');
+%             end
+% 
+%             if length(obj.w) ~= obj.m_max
+%                 error('TimeStepWeight:w:invalidSize', 'Weight function must be same length as t.');
+%             end
+% 
+%             if any(isnan(obj.w))
+%                 error('TimeStepWeight:w:NaN', 'Weight function contains NaN values.');
+%             end
         end
 
         function check_general_property(~, property, property_name)
@@ -231,25 +248,7 @@ classdef TimeStepAlgorithmParallel < matlab.System
             i_impr = dt * tau_s * Vb * K * i_impr;
         end
 
-        function v_impr = compute_v_impr(i_impr, ga)
-            %COMPUTE_V_IMPR Summary of this method goes here
-            %   i_impr [i_{impr}] Impressed current [A]
-            %   ga [g_{a}] Antenna impulse response admittance [S]
-
-            Nga = length(ga);
-            if length(i_impr) ~= Nga
-                error('TimeStepWeight:compute_v_impr:notEqualSize', ...
-                      'Arguments i_impr and ga must be of equal length');
-            end
-
-            v_impr = NaN(1, Nga);
-
-            parfor m = 1 : Nga
-                v_impr(m) = sum(i_impr(1 : m) .* fliplr(ga(1 : m)));
-            end
-        end
-
-        function vm = compute_vm(m, v, vm_impr, i_int, i_int_prev, gl, w, Fsm_m, alpha)
+        function vm = compute_vm(w0, Fsm_m, h0, Tm, C, Cv)
             %COMPUTE_V_STEP Summary of this method goes here
             %   m [m] Step index [-]
             %   dt [\delta_{t}] Time step [s]
@@ -259,23 +258,18 @@ classdef TimeStepAlgorithmParallel < matlab.System
             %   ga [g_{a}] Antenna impulse response admittance [S]
             %   alpha [\alpha] Attenuation in previous current for one time step [-]
 
-            if m == 1
-                vm = (vm_impr - alpha * i_int_prev * gl(1)) / (Fsm_m * gl(1) + w(1));
-            else
-                conv_1 = sum(v(1 : m - 1) .* fliplr(w(2 : m)));
-                conv_2 = sum(i_int(1 : m - 1) .* fliplr(gl(2 : m)));
-                vm = (vm_impr - alpha * i_int_prev * gl(1) - conv_1 - conv_2) / (Fsm_m * gl(1) + w(1));
-            end
+%             vm = inv(w(1) + Fsm_m * h0) * (h0 * Tm_prev + C_prev * [1; 1] - Cv);
+            vm = (w0 + Fsm_m * h0) \ (h0 * Tm + C * [1; 1] - Cv);
         end
 
-        function im_int = compute_im_int(i_int_prev, vm, Fsm_m, alpha)
+        function im = compute_im(vm, Tm, Fsm_m)
             %COMPUTE_I_STEP Summary of this method goes here
             %   i_int_prev [i(m-1)] Internal current at time instance m - 1 [A]
             %   vm [v(m)] Transient voltage at time instance m [V]
             %   Fsm_m [F_{m}^{s}[m]] Impulse response [S]
             %   alpha [\alpha] Attenuation in previous current for one time step [-]
             
-            im_int = alpha * i_int_prev + vm * Fsm_m;
+            im = Tm - vm * Fsm_m;
         end
     end
 end
