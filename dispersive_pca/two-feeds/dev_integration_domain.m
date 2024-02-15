@@ -26,11 +26,11 @@ figure('Position', [250 250 750 450]);
 
 SP  = plot(kx, s, 'LineWidth', 1.5, 'DisplayName', 'sin(x) / x');
 hold on;
-AP  = xline(a, '--', 'LineWidth', 1.5, 'Color', '#7E2F8E', 'DisplayName', '1st zero');
+AP  = xline(a, ':', 'LineWidth', 1.5, 'Color', '#7E2F8E', 'DisplayName', '1st zero');
 hold on;
 AFP = xline(af, '--', 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayName', '15th zero');
 hold on;
-xline(- a, '--', 'LineWidth', 1.5, 'Color', "#7E2F8E", 'DisplayName', '1st zero');
+xline(- a, ':', 'LineWidth', 1.5, 'Color', "#7E2F8E", 'DisplayName', '1st zero');
 hold on;
 xline(- af, '--', 'LineWidth', 1.5, 'Color', "#A2142F", 'DisplayName', '15th zero');
 
@@ -42,7 +42,7 @@ annotation('textbox', [0.235 0.76 0.22 0.1], 'String', 'integration domain', 'Co
 
 xlabel('\Re \{k_{x} / k_{0}\}');
 ylabel('sinc(k_{x}\Delta / 2)');
-title(['@ \Delta = ' num2str(d_gap * 1e6) ' \mum']);
+title(['@ \Delta = ' num2str(d_gap * 1e6) ' \mum, \lambda_{0} = ' num2str(round(wlen * 1e6, 2)) ' \mum']);
 
 %% FUNCTIONS
 function a = get_integration_domain(d_gap, f, N)
