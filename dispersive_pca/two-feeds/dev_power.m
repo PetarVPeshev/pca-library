@@ -98,6 +98,23 @@ title(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' 
 % PLOT
 figure('Position', [250 250 750 450]);
 
+plot(t * 1e12, vs(1, :), 'LineWidth', 1.5, 'DisplayName', 'v_{s}');
+hold on;
+plot(t * 1e12, vm(1, :), 'LineWidth', 1.5, 'DisplayName', 'v_{m}');
+hold on;
+plot(t * 1e12, v(1, :), '--', 'LineWidth', 1.5, 'DisplayName', 'v');
+
+grid on;
+legend('Location', 'bestoutside');
+
+xlabel('t [ps]');
+ylabel('v [V]');
+title(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d = ' ...
+       num2str(d * 1e6) ' \mum, P = ' num2str(P * 1e3) ' mW']);
+
+% PLOT
+figure('Position', [250 250 750 450]);
+
 plot(t * 1e12, v(1, :), 'LineWidth', 1.5, 'DisplayName', 'v');
 hold on;
 plot(t * 1e12, vs(1, :) + vm(1, :), '--', 'LineWidth', 1.5, 'DisplayName', 'v_{s} + v_{m}');
@@ -343,31 +360,31 @@ function [Es, Em, Et] = eval_E(V, I, Znm)  % FREQUENCY-DOMAIN
 
     Es = NaN(N, Nf);
     Em = Es;
-    Et = Es;
+    % Et = Es;
 
-    Ss1 = I(1, :) .* (I(1, :) .* Znm{1, 1});
-    Ss2 = I(2, :) .* (I(2, :) .* Znm{2, 2});
+    Es(1, :) = real(I(1, :) .* (I(1, :) .* Znm{1, 1}));
+    Es(1, :) = real(I(2, :) .* (I(2, :) .* Znm{2, 2}));
 
-    Sm1 = I(1, :) .* (I(2, :) .* Znm{1, 2});
-    Sm2 = I(2, :) .* (I(1, :) .* Znm{2, 1});
+    Em(1, :) = real(I(1, :) .* (I(2, :) .* Znm{1, 2}));
+    Em(2, :) = real(I(2, :) .* (I(1, :) .* Znm{2, 1}));
 
-    St = I .* V;
+    Et = real(I .* V);
 
     % self
-    Es(1, :) = abs(I(1, :)) .* abs(I(1, :) .* Znm{1, 1});
-    Es(2, :) = abs(I(2, :)) .* abs(I(2, :) .* Znm{2, 2});
+    % Es(1, :) = abs(I(1, :)) .* abs(I(1, :) .* Znm{1, 1});
+    % Es(2, :) = abs(I(2, :)) .* abs(I(2, :) .* Znm{2, 2});
     % Es(1, :) = I(1, :) .* conj(I(1, :) .* Znm{1, 1});
     % Es(2, :) = I(2, :) .* conj(I(2, :) .* Znm{2, 2});
 
     % mutual
-    Em(1, :) = abs(I(1, :)) .* abs(I(2, :) .* Znm{1, 2});
-    Em(2, :) = abs(I(2, :)) .* abs(I(1, :) .* Znm{2, 1});
+    % Em(1, :) = abs(I(1, :)) .* abs(I(2, :) .* Znm{1, 2});
+    % Em(2, :) = abs(I(2, :)) .* abs(I(1, :) .* Znm{2, 1});
     % Em(1, :) = I(1, :) .* conj(I(2, :) .* Znm{1, 2});
     % Em(2, :) = I(2, :) .* conj(I(1, :) .* Znm{2, 1});
 
     % total
-    Et(1, :) = abs(I(1, :)) .* abs(V(1, :));
-    Et(2, :) = abs(I(2, :)) .* abs(V(2, :));
+    % Et(1, :) = abs(I(1, :)) .* abs(V(1, :));
+    % Et(2, :) = abs(I(2, :)) .* abs(V(2, :));
     % Et(1, :) = I(1, :) .* conj(V(1, :));
     % Et(2, :) = I(2, :) .* conj(V(2, :));
 
