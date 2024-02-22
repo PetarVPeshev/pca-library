@@ -5,6 +5,8 @@ clc;
 env;
 sim_params;
 
+COLORS = ["#0072BD", "#D95319", "#7E2F8E", "#77AC30"];
+
 %% PARAMETERS
 f       = linspace(1 * 1e6, 2 * 1e12, 4001);  % START FREQUENCY INFLUENCES RESULTS
 df      = f(2) - f(1);
@@ -12,7 +14,7 @@ dt      = 1 * 1e-15;
 [t, tt] = create_t_vec(dt, -0.5 * 1e-12, 5 * 1e-12);
 % FEED
 d_gap = 10 * 1e-6;
-d     = 200 * 1e-6;
+d     = linspace(50, 200, 4) * 1e-6;
 % SLOT WIDTH
 ws = 10 * 1e-6;
 % LASER POWER
@@ -25,6 +27,7 @@ tau_d = linspace(0, 2.5, 51) * 1e-12;
 Nf    = length(f);
 Nt    = length(t);
 Ntaud = length(tau_d);
+Nd    = length(d);
 
 %% SLOT, PHOTO-CONDUCTOR, LASER, AND TIME-STEP
 slot      = create_slot(d_gap, ws, params_slot);
@@ -35,127 +38,138 @@ time_step = TimeStepAlgorithmTwoFeeds2(t);
 %% INPUT IMPEDANCE
 Zin = slot.compute_zin(f);
 
-%% MUTUAL IMPEDANCE
-Znm = eval_Znm(f, slot, d);
-
-% TIME-DOMAIN
-znm = compute_znm(tt, f, Znm);
-
-%% WEIGHT
-W = (1 ./ Zin) .^ 2;
-
-% TIME-DOMAIN
-w = 2 * real(eval_IFT(tt, f, W));
-
-%% IMPEDANCE WITH WEIGHT
-H = eval_Hnm(Znm, W);
-
-% TIME-DOMAIN
-h = compute_h(tt, f, H);
-
-%% PHOTO-CONDUCTIVE ANTENNA
-pca = PhotoConductiveAntenna(laser, pcm, Vb, h{1,1}, 't_vec', t, 'eta_opt', 1);
-
-Ps      = NaN(2, Ntaud);
+Ps      = NaN(Nd, Ntaud);
 Pm      = Ps;
 Pl      = Ps;
 Ppseudo = Ps;
 Pt      = Ps;
-for idx = 1 : Ntaud
-    %% TIME-STEP
-    % Reset time step algorithm
-    release(time_step);
-    reset(time_step);
+for d_idx = 1 : Nd
+    %% MUTUAL IMPEDANCE
+    Znm = eval_Znm(f, slot, d(d_idx));
     
-    % Set time-step algorithm parameters
-    time_step.K       = pca.K;
-    time_step.Vb      = Vb;
-    time_step.h       = h;
-    time_step.w       = w;
-    time_step.tau_c   = pcm.tau_rec;
-    time_step.tau_s   = pcm.tau_s;
-    time_step.sigma_t = laser.sigma_t;
-    time_step.tau_d   = [tau_d(idx) 0];
+    % TIME-DOMAIN
+    znm = compute_znm(tt, f, Znm);
     
-    % Voltage and currents
-    v     = NaN(2, Nt);
-    i     = v;
-    i_int = v;
-    vs    = v;
-    vm    = v;
+    %% WEIGHT
+    W = (1 ./ Zin) .^ 2;
     
-    for m = 1 : 1 : Nt
-        [v(:, m), ~, i(:, m), i_int(:, m), vs(:, m), vm(:, m)] = step(time_step);
+    % TIME-DOMAIN
+    w = 2 * real(eval_IFT(tt, f, W));
+    
+    %% IMPEDANCE WITH WEIGHT
+    H = eval_Hnm(Znm, W);
+    
+    % TIME-DOMAIN
+    h = compute_h(tt, f, H);
+    
+    %% PHOTO-CONDUCTIVE ANTENNA
+    pca = PhotoConductiveAntenna(laser, pcm, Vb, h{1,1}, 't_vec', t, 'eta_opt', 1);
+    
+    for idx = 1 : Ntaud
+        %% TIME-STEP
+        % Reset time step algorithm
+        release(time_step);
+        reset(time_step);
+        
+        % Set time-step algorithm parameters
+        time_step.K       = pca.K;
+        time_step.Vb      = Vb;
+        time_step.h       = h;
+        time_step.w       = w;
+        time_step.tau_c   = pcm.tau_rec;
+        time_step.tau_s   = pcm.tau_s;
+        time_step.sigma_t = laser.sigma_t;
+        time_step.tau_d   = [tau_d(idx) 0];
+        
+        % Voltage and currents
+        v     = NaN(2, Nt);
+        i     = v;
+        i_int = v;
+        vs    = v;
+        vm    = v;
+        
+        for m = 1 : 1 : Nt
+            [v(:, m), ~, i(:, m), i_int(:, m), vs(:, m), vm(:, m)] = step(time_step);
+        end
+        
+        %% INSTANTANEOUS POWER
+        [ps, pm, pl, pdiss, pt, p_pseudo] = eval_p_td(v, vm, vs, i, i_int, Vb);
+        
+        %% AVERAGE POWER
+        [Ps_temp, Pm_temp, Pl_temp, Ppseudo_temp, Pt_temp] ...
+            = eval_P(ps, pm, pl, p_pseudo, pt, dt, laser.T);
+
+        Ps(d_idx, idx)      = Ps_temp(1);
+        Pm(d_idx, idx)      = Pm_temp(1);
+        Pl(d_idx, idx)      = Pl_temp(1);
+        Ppseudo(d_idx, idx) = Ppseudo_temp(1);
+        Pt(d_idx, idx)      = Pt_temp(1);
     end
-    
-    %% INSTANTANEOUS POWER
-    [ps, pm, pl, pdiss, pt, p_pseudo] = eval_p_td(v, vm, vs, i, i_int, Vb);
-    
-    %% AVERAGE POWER
-    [Ps(:, idx), Pm(:, idx), Pl(:, idx), Ppseudo(:, idx), Pt(:, idx)] ...
-        = eval_P(ps, pm, pl, p_pseudo, pt, dt, laser.T);
 end
 
 % PLOT
-figure('Position', [250 250 1100 500]);
+figure('Position', [250 250 1400 500]);
 
 subplot(2, 2, 1);
-plot(tau_d * 1e12, Ps(1, :) * 1e6, 'LineWidth', 1.5, 'Color', '#0072BD', 'DisplayName', 'FEED 1');
-hold on;
-plot(tau_d * 1e12, Ps(2, :) * 1e6, '--+', 'LineWidth', 1.5, 'Color', '#0072BD', ...
-     'MarkerIndices', 1 : 8 : Ntaud, 'DisplayName', 'FEED 2');
-hold on;
-plot(tau_d * 1e12, Pm(1, :) * 1e6, 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayName', 'FEED 1');
-hold on;
-plot(tau_d * 1e12, Pm(2, :) * 1e6, '--+', 'LineWidth', 1.5, 'Color', '#A2142F', ...
-     'MarkerIndices', 1 : 8 : Ntaud, 'DisplayName', 'FEED 2');
+for d_idx = 1 : Nd
+    plot(tau_d * 1e12, Ps(d_idx, :) * 1e6, 'LineWidth', 1.5, 'Color', COLORS(d_idx), ...
+         'DisplayName', ['d = ' num2str(d(d_idx) * 1e6) ' \mum']);
+    hold on;
+end
+hold off;
 
 grid on;
-ylim([0 20]);
+legend('location', 'bestoutside');
 
 ylabel('P [\muW]');
-title('SELF & MUTUAL POWER');
+title('SELF POWER');
 
 subplot(2, 2, 3);
-plot(tau_d * 1e12, Pl(1, :) * 1e6, 'LineWidth', 1.5, 'Color', '#EDB120', 'DisplayName', 'FEED 1');
-hold on;
-plot(tau_d * 1e12, Pl(2, :) * 1e6, '--+', 'LineWidth', 1.5, 'Color', '#EDB120', ...
-     'MarkerIndices', 1 : 8 : Ntaud, 'DisplayName', 'FEED 2');
+for d_idx = 1 : Nd
+    plot(tau_d * 1e12, Pm(d_idx, :) * 1e6, 'LineWidth', 1.5, 'Color', COLORS(d_idx), ...
+         'DisplayName', ['d = ' num2str(d(d_idx) * 1e6) ' \mum']);
+    hold on;
+end
+hold off;
 
 grid on;
-ylim([15 25]);
+legend('location', 'bestoutside');
 
 xlabel('\tau_{d} [ps]');
+ylabel('P [\muW]');
+title('MUTUAL POWER');
+
+subplot(2, 2, 2);
+for d_idx = 1 : Nd
+    plot(tau_d * 1e12, Pl(d_idx, :) * 1e6, 'LineWidth', 1.5, 'Color', COLORS(d_idx), ...
+         'DisplayName', ['d = ' num2str(d(d_idx) * 1e6) ' \mum']);
+    hold on;
+end
+hold off;
+
+grid on;
+legend('location', 'bestoutside');
+
 ylabel('P [\muW]');
 title('RADIATED POWER');
 
-subplot(2, 2, 2);
-plot(tau_d * 1e12, Pt(1, :) * 1e6, 'LineWidth', 1.5, 'Color', '#77AC30', 'DisplayName', 'FEED 1');
-hold on;
-plot(tau_d * 1e12, Pt(2, :) * 1e6, '--+', 'LineWidth', 1.5, 'Color', '#77AC30', ...
-     'MarkerIndices', 1 : 8 : Ntaud, 'DisplayName', 'FEED 2');
-
-grid on;
-ylim([150 165]);
-
-ylabel('P [\muW]');
-title('TOTAL POWER');
-
 subplot(2, 2, 4);
-plot(tau_d * 1e12, Ppseudo(1, :) * 1e6, 'LineWidth', 1.5, 'Color', '#7E2F8E', 'DisplayName', 'P_{t1}');
-hold on;
-plot(tau_d * 1e12, Ppseudo(2, :) * 1e6, '--+', 'LineWidth', 1.5, 'Color', '#7E2F8E', ...
-     'MarkerIndices', 1 : 8 : Ntaud, 'DisplayName', 'P_{t2}');
+for d_idx = 1 : Nd
+    plot(tau_d * 1e12, Pt(d_idx, :) * 1e6, 'LineWidth', 1.5, 'Color', COLORS(d_idx), ...
+         'DisplayName', ['d = ' num2str(d(d_idx) * 1e6) ' \mum']);
+    hold on;
+end
+hold off;
 
 grid on;
-ylim([0 10]);
+legend('location', 'bestoutside');
 
 xlabel('\tau_{d} [ps]');
 ylabel('P [\muW]');
-title('PSEUDO POWER');
+title('TOTAL POWER');
 
-sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d = ' ...
-         num2str(d * 1e6) ' \mum, P = ' num2str(P * 1e3) ' mW'], 'FontSize', 11, 'FontWeight', 'bold');
+sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, P = ' ...
+        num2str(P * 1e3) ' mW'], 'FontSize', 11, 'FontWeight', 'bold');
 
 %% FUNCTIONS
 % FUNCTIONS USED TO CREATE OBJECTS AND VECTORS

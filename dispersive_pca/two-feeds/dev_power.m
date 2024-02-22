@@ -345,6 +345,14 @@ function [Es, Em, Et] = eval_E(V, I, Znm)  % FREQUENCY-DOMAIN
     Em = Es;
     Et = Es;
 
+    Ss1 = I(1, :) .* (I(1, :) .* Znm{1, 1});
+    Ss2 = I(2, :) .* (I(2, :) .* Znm{2, 2});
+
+    Sm1 = I(1, :) .* (I(2, :) .* Znm{1, 2});
+    Sm2 = I(2, :) .* (I(1, :) .* Znm{2, 1});
+
+    St = I .* V;
+
     % self
     Es(1, :) = abs(I(1, :)) .* abs(I(1, :) .* Znm{1, 1});
     Es(2, :) = abs(I(2, :)) .* abs(I(2, :) .* Znm{2, 2});
