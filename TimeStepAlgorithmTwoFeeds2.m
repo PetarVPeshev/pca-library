@@ -17,23 +17,27 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
         tau_c       (1,1) double
         tau_s       (1,1) double
         sigma_t     (1,1) double
+        tau_d       (1,2) double
     end
 
     properties (DiscreteState)
         m
+        i
         i_int
         v
+        vs
         T_prev
         C_int
         Cv
+        Csv
         is_done
     end
 
     properties (SetAccess = protected)
         w0          (2,2) double
         h0          (2,2) double
-        Fsm         (1,:) double
-        i_impr      (1,:) double
+        Fsm         (2,2) cell
+        i_impr      (2,:) double
         C_impr      (2,2) cell
         alpha       (1,1) double  % attenuation of current for one time step
     end
@@ -59,6 +63,7 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
                 params.tau_c    (1,1) double = 0
                 params.tau_s    (1,1) double = 0
                 params.sigma_t  (1,1) double = 0
+                params.tau_d    (1,1) double = 0
             end
 
             obj.dt    = t(2) - t(1);
@@ -72,6 +77,7 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
             obj.tau_c   = params.tau_c;
             obj.tau_s   = params.tau_s;
             obj.sigma_t = params.sigma_t;
+            obj.tau_d   = params.tau_d;
         end
     end
 
@@ -81,13 +87,13 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
 
             obj.w0     = eye(2) * obj.w(1);
             obj.h0     = [obj.h{1,1}(1) obj.h{1,2}(1); obj.h{2,1}(1) obj.h{2,2}(1)];
-            obj.Fsm    = obj.compute_Fsm(obj.t, obj.K, obj.sigma_t, obj.tau_c);
-            obj.i_impr = obj.compute_i_impr(obj.t, obj.Vb, obj.K, obj.sigma_t, obj.tau_c, obj.tau_s);
+            obj.Fsm    = obj.compute_Fsm(obj.t, obj.K, obj.sigma_t, obj.tau_c, obj.tau_d);
+            obj.i_impr = obj.compute_i_impr(obj.t, obj.Vb, obj.K, obj.sigma_t, obj.tau_c, obj.tau_s, obj.tau_d);
             obj.C_impr = obj.compute_Cimpr(obj.i_impr, obj.h);
             obj.alpha  = exp(- obj.dt / obj.tau_c) * exp(- obj.dt / obj.tau_s);
         end
 
-        function [vm, vgm, im, im_int] = stepImpl(obj)
+        function [vm, vgm, im, im_int, vsm, vmm] = stepImpl(obj)
             % Calculate transient voltage, radiating and internal current at time step m as a function of 
             % the antenna parameters and discrete states.
 
@@ -95,7 +101,7 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
             mm = obj.m + 1;
 
             if ~obj.is_done
-                Fsm_m   = obj.Fsm(mm);
+                Fsm_m   = [obj.Fsm{1,1}(mm) obj.Fsm{1,2}; obj.Fsm{2,1} obj.Fsm{2,2}(mm)];
                 Cimpr_m = [obj.C_impr{1,1}(mm) obj.C_impr{1,2}(mm); ...
                            obj.C_impr{2,1}(mm) obj.C_impr{2,2}(mm)];
                 
@@ -111,7 +117,18 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
                 obj.i_int(:, mm) = im_int;
 
                 % Compute internal current at m
-                im = obj.i_impr(mm) - im_int;
+                im           = obj.i_impr(:, mm) - im_int;
+                obj.i(:, mm) = im;
+
+                % Compute self voltage at m
+                Cs1           = sum(obj.i(1, 1 : mm) .* fliplr(obj.h{1, 1}(1 : mm)));
+                Cs2           = sum(obj.i(2, 1 : mm) .* fliplr(obj.h{2, 2}(1 : mm)));
+                Cs            = [Cs1; Cs2];
+                vsm           = obj.compute_vsm(obj.w0, Cs, obj.Csv);
+                obj.vs(:, mm) = vsm;
+
+                % Compute mutual voltage at m
+                vmm = vm - vsm;
 
                 % Set is_done flag
                 obj.is_done = mm == obj.m_max;
@@ -129,6 +146,10 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
                     Cv1    = sum(obj.v(1, 1 : mm) .* fliplr(obj.w(2 : mm + 1)));
                     Cv2    = sum(obj.v(2, 1 : mm) .* fliplr(obj.w(2 : mm + 1)));
                     obj.Cv = [Cv1; Cv2];
+
+                    Csv1    = sum(obj.vs(1, 1 : mm) .* fliplr(obj.w(2 : mm + 1)));
+                    Csv2    = sum(obj.vs(2, 1 : mm) .* fliplr(obj.w(2 : mm + 1)));
+                    obj.Csv = [Csv1; Csv2];
                 end
 
                 obj.m = mm;
@@ -142,11 +163,14 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
             % and set is_done flag to false
 
             obj.m       = 0;
-            obj.i_int       = NaN(2, obj.m_max);
+            obj.i       = NaN(2, obj.m_max);
+            obj.i_int   = NaN(2, obj.m_max);
             obj.v       = NaN(2, obj.m_max);
+            obj.vs      = NaN(2, obj.m_max);
             obj.T_prev  = [0; 0];
             obj.C_int   = [0 0; 0 0];
             obj.Cv      = [0; 0];
+            obj.Csv     = [0; 0];
             obj.is_done = false;
         end
 
@@ -156,8 +180,8 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
 
             obj.w0     = 0;
             obj.h0     = 0;
-            obj.Fsm    = double.empty(1, 0);
-            obj.i_impr = double.empty(1, 0);
+            obj.Fsm    = cell(2, 2);
+            obj.i_impr = double.empty(2, 0);
             obj.C_impr = cell(2, 2);
             obj.alpha  = 0;
         end
@@ -211,7 +235,7 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
     end
 
     methods (Static)
-        function Fsm = compute_Fsm(t, K, sigma_t, tau_c)
+        function Fsm = compute_Fsm(t, K, sigma_t, tau_c, tau_d)
             %COMPUTE_FSM Summary of this method goes here
             %   dt [\delta_{t}] Time step [s]
             %   hm_n [h_{m}[n]] Impulse response (m - rows, n - cols)
@@ -219,21 +243,32 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
 
             m_max = length(t);
             dt    = t(2) - t(1);
-            Fsm   = NaN(1, m_max);
+            Fsm_1 = NaN(1, m_max);
+            Fsm_2 = NaN(1, m_max);
 
             parfor m = 1 : m_max
-                hm = 0;
+                hm_1 = 0;
                 for n = 1 : m
-                    hm = hm + exp(- 0.5 * (t(n) / sigma_t) ^ 2) * exp(- (t(m) - t(n)) / tau_c);
+                    hm_1 = hm_1 + exp(- 0.5 * ( (t(n) - tau_d(1)) / sigma_t) ^ 2) * exp(- (t(m) - t(n)) / tau_c);
                 end
 
-                Fsm(m) = hm;
+                Fsm_1(m) = hm_1;
+
+                hm_2 = 0;
+                for n = 1 : m
+                    hm_2 = hm_2 + exp(- 0.5 * ( (t(n) - tau_d(2)) / sigma_t) ^ 2) * exp(- (t(m) - t(n)) / tau_c);
+                end
+
+                Fsm_2(m) = hm_2;
             end
 
-            Fsm = (dt ^ 2) * K * Fsm;
+            Fsm_1 = (dt ^ 2) * K * Fsm_1;
+            Fsm_2 = (dt ^ 2) * K * Fsm_2;
+
+            Fsm = {Fsm_1, 0; 0, Fsm_2};
         end
 
-        function i_impr = compute_i_impr(t, Vb, K, sigma_t, tau_c, tau_s)
+        function i_impr = compute_i_impr(t, Vb, K, sigma_t, tau_c, tau_s, tau_d)
             %COMPUTE_I_IMPR Summary of this method goes here
             %   t [t] Simulation time [s]
             %   hm_n [h_{m}[n]] Impulse response (m - rows, n - cols)
@@ -241,27 +276,36 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
             %   K [K] Photo-conductive antenna constant [S/s^2]
             %   tau_s [\tau_{s}] Scattering time [s]
 
-            m_max = length(t);
-            dt     = t(2) - t(1);
-            i_impr = NaN(1, m_max);
+            m_max    = length(t);
+            dt       = t(2) - t(1);
+            i_impr_1 = NaN(1, m_max);
+            i_impr_2 = NaN(1, m_max);
 
             parfor m = 1 : m_max
-                Hm = 0;
+                Hm_1 = 0;
                 for n = 1 : m
-                    Hm = Hm + exp(- 0.5 * (t(n) / sigma_t) ^ 2) * exp(- (t(m) - t(n)) / tau_c) ...
+                    Hm_1 = Hm_1 + exp(- 0.5 * ( (t(n) - tau_d(1)) / sigma_t) ^ 2) * exp(- (t(m) - t(n)) / tau_c) ...
                             * (1 - exp(- (t(m) - t(n)) / tau_s));
                 end
 
-                i_impr(m) = Hm;
+                i_impr_1(m) = Hm_1;
+
+                Hm_2 = 0;
+                for n = 1 : m
+                    Hm_2 = Hm_2 + exp(- 0.5 * ( (t(n) - tau_d(2)) / sigma_t) ^ 2) * exp(- (t(m) - t(n)) / tau_c) ...
+                            * (1 - exp(- (t(m) - t(n)) / tau_s));
+                end
+
+                i_impr_2(m) = Hm_2;
             end
 
-            i_impr = dt * tau_s * Vb * K * i_impr;
+            i_impr = dt * tau_s * Vb * K * [i_impr_1; i_impr_2];
         end
 
         function Cimpr = compute_Cimpr(i_impr, h)
             %COMPUTE_CIMPR Summary of this method goes here
             % Detailed explanation goes here
-            m_max = length(i_impr);
+            m_max = size(i_impr, 2);
 
             h_11 = h{1,1};
             h_12 = h{1,2};
@@ -269,10 +313,10 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
             h_22 = h{2,2};
 
             parfor m = 1 : m_max
-                Cimpr_11(m) = sum(i_impr(1 : m) .* fliplr(h_11(1 : m)));
-                Cimpr_12(m) = sum(i_impr(1 : m) .* fliplr(h_12(1 : m)));
-                Cimpr_21(m) = sum(i_impr(1 : m) .* fliplr(h_21(1 : m)));
-                Cimpr_22(m) = sum(i_impr(1 : m) .* fliplr(h_22(1 : m)));
+                Cimpr_11(m) = sum(i_impr(1, 1 : m) .* fliplr(h_11(1 : m)));
+                Cimpr_12(m) = sum(i_impr(2, 1 : m) .* fliplr(h_12(1 : m)));
+                Cimpr_21(m) = sum(i_impr(1, 1 : m) .* fliplr(h_21(1 : m)));
+                Cimpr_22(m) = sum(i_impr(2, 1 : m) .* fliplr(h_22(1 : m)));
             end
 
             Cimpr = {Cimpr_11, Cimpr_12; Cimpr_21, Cimpr_22};
@@ -288,8 +332,7 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
             %   ga [g_{a}] Antenna impulse response admittance [S]
             %   alpha [\alpha] Attenuation in previous current for one time step [-]
 
-%             vm = inv(w(1) + Fsm_m * h0) * (h0 * Tm_prev + C_prev * [1; 1] - Cv);
-            vm = (w0 + Fsm_m * h0) \ (Cimpr_m * [1; 1] - h0 * T_prev - C_int * [1; 1] - Cv);
+            vm = (w0 + h0 * Fsm_m) \ (Cimpr_m * [1; 1] - h0 * T_prev - C_int * [1; 1] - Cv);
         end
 
         function im_int = compute_im_int(vm, T_prev, Fsm_m)
@@ -299,7 +342,14 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
             %   Fsm_m [F_{m}^{s}[m]] Impulse response [S]
             %   alpha [\alpha] Attenuation in previous current for one time step [-]
             
-            im_int = T_prev + vm * Fsm_m;
+            im_int = T_prev + Fsm_m * vm;
+        end
+
+        function vsm = compute_vsm(w0, Cs, Csv)
+            %COMPUTE_VSM Summary of this method goes here
+            %   Detailed explanation goes here
+
+            vsm = w0 \ (Cs - Csv);
         end
     end
 end

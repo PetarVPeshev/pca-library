@@ -141,6 +141,7 @@ time_step.w       = w;
 time_step.tau_c   = pcm.tau_rec;
 time_step.tau_s   = pcm.tau_s;
 time_step.sigma_t = laser.sigma_t;
+time_step.tau_d   = [0 0];
 
 % Voltage and currents
 v     = NaN(2, Nt);
@@ -148,7 +149,7 @@ i     = v;
 i_int = v;
 
 for m = 1 : 1 : Nt
-    [v(:, m), ~, i(:, m), i_int(:, m)] = step(time_step);
+    [v(:, m), ~, i(:, m), i_int(:, m), ~, ~] = step(time_step);
 end
 
 i_impr = time_step.i_impr;
