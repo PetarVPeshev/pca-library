@@ -63,7 +63,7 @@ classdef TimeStepAlgorithmTwoFeeds2 < matlab.System
                 params.tau_c    (1,1) double = 0
                 params.tau_s    (1,1) double = 0
                 params.sigma_t  (1,1) double = 0
-                params.tau_d    (1,1) double = 0
+                params.tau_d    (1,2) double = 0
             end
 
             obj.dt    = t(2) - t(1);
