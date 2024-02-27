@@ -12,7 +12,8 @@ function varargout = create_time_arrays(dt, time_lim, out_type)
     end
 
     t_sim = time_lim(1) : dt : time_lim(2);     % Simulation time vector
-    t_res = (0 : 1 : length(t_sim) - 1) * dt;   % Impulse response time vector
+    N     = length(t_sim);                      % Number of time points
+    t_res = (0 : 1 : N - 1) * dt;               % Impulse response time vector
 
     if strcmp(out_type, 'arrays')
         if isequal(t_sim, t_res)
@@ -22,6 +23,6 @@ function varargout = create_time_arrays(dt, time_lim, out_type)
             varargout{2} = t_res;
         end
     else
-        varargout = struct('t_sim', t_sim, 't_res', t_res, 'dt', dt);
+        varargout = struct('t_sim', t_sim, 't_res', t_res, 'dt', dt, 'N', N);
     end
 end
