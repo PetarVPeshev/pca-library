@@ -9,12 +9,12 @@ sim_params;
 % SLOT
 ws     = 10 * 1e-6;   % SLOT WIDTH    : 10 um
 d_gap  = 10 * 1e-6;   % FEED WIDTH    : 10 um
-d_feed = 200 * 1e-6;  % FEED DISTANCE : 100 um
+d_feed = 100 * 1e-6;  % FEED DISTANCE : 100 um
 % PHOTO-CONDUCTORS
 Vb    = [30; 0];            % BIAS VOLTAGE  : 30 V & 0 V
-tau_d = [0 1.6] * 1e-12;    % EXCITATION DELAY : 0 ps & 0 ps
+tau_d = [0 0] * 1e-12;    % EXCITATION DELAY : 0 ps & 0 ps
 % LASER
-P = 5 * 1e-3;  % AVERAGE POWER : 10 mW
+P = 10 * 1e-3;  % AVERAGE POWER : 10 mW
 % SIMULATION TIME
 t_lims = [-1 10] * 1e-12;   % TIME LIMITS : -1 ps to 10 ps
 dt     = 0.5 * 1e-15;       % TIME STEP   : 0.5 fs
@@ -186,55 +186,31 @@ time_step.sigma_t = laser.sigma_t;
 i_impr = time_step.i_impr;
 i_int  = i_impr - i;
 
-figure('Position', [250 250 1350 750]);
+figure('Position', [250 250 1050 550]);
 
-subplot(4, 1, 1);
+subplot(2, 1, 1);
 plot(tsim * 1e12, v(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', 'DisplayName', 'v_{1}');
 hold on;
 plot(tsim * 1e12, v(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayName', 'v_{2}');
 
 grid on;
 xlim([-0.3 2.5]);
-ylim([-1 8]);
+% ylim([-1 8]);
 legend('location', 'bestoutside');
 
 ylabel('v [V]');
 
-subplot(4, 1, 2);
+subplot(2, 1, 2);
 plot(tsim * 1e12, i(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', 'DisplayName', 'i_{1}');
 hold on;
 plot(tsim * 1e12, i(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayName', 'i_{2}');
 
 grid on;
 xlim([-0.3 2.5]);
-ylim([0 0.2]);
+% ylim([0 0.2]);
 legend('location', 'bestoutside');
 
 ylabel('i [A]');
-
-subplot(4, 1, 3);
-plot(tsim * 1e12, i_impr(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', 'DisplayName', 'i_{impr,1}');
-hold on;
-plot(tsim * 1e12, i_impr(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayName', 'i_{impr,2}');
-
-grid on;
-xlim([-0.3 2.5]);
-ylim([0 0.2]);
-legend('location', 'bestoutside');
-
-ylabel('i_{impr} [A]');
-
-subplot(4, 1, 4);
-plot(tsim * 1e12, i_int(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', 'DisplayName', 'i_{int,1}');
-hold on;
-plot(tsim * 1e12, i_int(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayName', 'i_{int,2}');
-
-grid on;
-xlim([-0.3 2.5]);
-ylim([0 0.2]);
-legend('location', 'bestoutside');
-
-ylabel('i_{int} [A]');
 xlabel('t [ps]');
 sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
         num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], 'FontSize', 11, ...
