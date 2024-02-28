@@ -1,16 +1,18 @@
-function H = compute_H(Z)
+function [H, W] = compute_H(Z, args)
 %COMPUTE_H Summary of this function goes here
 %   Detailed explanation goes here
     arguments
-        Z (2,2,:) double {mustBeNonNan}
+        Z      (2,2,:) double {mustBeNonNan}
+        args.W (1,:)   double {mustBeNonNan} = double.empty(1, 0)
     end
 
-    Nf = size(Z, 3);
-    H  = NaN(2, 2, Nf);
+    if isempty(args.W)
+        args.W = (1 ./ Z(1, 1, :)) .^ 2;
+    else
+        args.W = permute(args.W, [1 3 2]);
+    end
 
-    H(1, 1, :) = 1 ./ Z(1, 1, :);
-    H(1, 2, :) = Z(1, 2, :) ./ Z(1, 1, :);
-    H(2, 1, :) = H(1, 2, :);
-    H(2, 2, :) = H(1, 1, :);
+    H = Z .* args.W;
+    W = permute(args.W, [1 3 2]);
 end
 

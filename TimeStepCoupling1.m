@@ -1,4 +1,4 @@
-classdef TimeStepCoupling < handle
+classdef TimeStepCoupling1 < handle
     % TimeStepAlgorithmCoupling Add summary here
     %   Detailed explanation goes here
 
@@ -11,6 +11,7 @@ classdef TimeStepCoupling < handle
     properties
         K           (1,1)   double
         Vb          (2,1)   double
+        w           (1,:)   double
         h           (2,2,:) double
         tau_c       (1,1)   double
         tau_s       (1,1)   double
@@ -19,25 +20,28 @@ classdef TimeStepCoupling < handle
     end
 
     properties (SetAccess = protected)
-        Y           (2,2) double
-        H           (2,2) double
-        Fsm         (2,:) double
+        W0          (2,2) double
+        H0          (2,2) double
+        Fs          (2,:) double
+        i_impr      (2,:) double
+        C_impr      (2,2,:) double
         alpha       (1,1) double
     end
 
     methods
-        function obj = TimeStepCoupling(t, params)
+        function obj = TimeStepCoupling1(t, params)
             % Support name-value pair arguments when constructing object
             %   Detailed explanation goes here
 
             arguments
                 t               (1,:)   double
                 params.K        (1,1)   double = 0
-                params.Vb       (2,1)   double = [0; 0]
-                params.h        (2,2,:) double = zeros(2, 2, 1)
+                params.Vb       (2,1)   double = zeros(2, 1)
+                params.w        (1,:)   double = double.empty(1, 0)
+                params.h        (2,2,:) double = double.empty(2, 2, 0)
                 params.tau_c    (1,1)   double = 0
                 params.tau_s    (1,1)   double = 0
-                params.tau_d    (1,2)   double = [0 0]
+                params.tau_d    (1,2)   double = zeros(1, 2)
                 params.sigma_t  (1,1)   double = 0
             end
 
@@ -48,6 +52,7 @@ classdef TimeStepCoupling < handle
             obj.K       = params.K;
             obj.Vb      = params.Vb;
             obj.h       = params.h;
+            obj.w       = params.w;
             obj.tau_c   = params.tau_c;
             obj.tau_s   = params.tau_s;
             obj.tau_d   = params.tau_d;
@@ -58,18 +63,23 @@ classdef TimeStepCoupling < handle
     methods(Access = protected)
         function setup(obj)
 
-            obj.h     = obj.h * obj.dt;
-            obj.Y     = [obj.h(1,1,1) 0; 0 obj.h(2,2,1)];
-            obj.H     = [1 obj.h(1,2,1); obj.h(2,1,1) 1];
+            obj.W0     = obj.w(1) * eye(2);
+            obj.H0     = obj.h(:, :, 1);
             
-            obj.Fsm   = obj.compute_Fsm(obj.t, obj.K, obj.sigma_t, obj.tau_c, obj.tau_d);
-            obj.alpha = exp(- obj.dt / obj.tau_c) * exp(- obj.dt / obj.tau_s);
+            obj.Fs     = obj.compute_Fs(obj.t, obj.K, obj.sigma_t, obj.tau_c, obj.tau_d);
+            obj.i_impr = obj.compute_i_impr(obj.t, obj.Vb, obj.K, obj.sigma_t, obj.tau_c, obj.tau_d, obj.tau_s);
+            obj.C_impr = obj.compute_C_impr(obj.i_impr, obj.h);
+            obj.alpha  = exp(- obj.dt / obj.tau_c) * exp(- obj.dt / obj.tau_s);
         end
 
         function reset(obj)
-            obj.Y      = zeros(2, 2);
-            obj.H      = zeros(2, 2);
-            obj.Fsm    = zeros(2, obj.m_max);
+
+            obj.W0     = zeros(2, 2);
+            obj.H0     = zeros(2, 2);
+
+            obj.Fs     = zeros(2, obj.m_max);
+            obj.i_impr = zeros(2, obj.m_max);
+            obj.C_impr = zeros(2, 2, obj.m_max);
             obj.alpha  = 0;
         end
 
@@ -82,6 +92,7 @@ classdef TimeStepCoupling < handle
             mustBeValidTimeStepScalar(obj.sigma_t);
 
             mustBeValidTimeStepMatrix(obj.Vb,    [2 1]);
+            mustBeValidTimeStepMatrix(obj.w,     [1 obj.m_max]);
             mustBeValidTimeStepMatrix(obj.h,     [2 2 obj.m_max]);
             mustBeValidTimeStepMatrix(obj.tau_d, [1 2]);
         end
@@ -93,26 +104,30 @@ classdef TimeStepCoupling < handle
             obj.reset();
             obj.setup();
 
-            v = NaN(2, obj.m_max);
-            i = v;
+            v     = NaN(2, obj.m_max);
+            i_int = v;
 
             % Initial conditions
-            Fsm_m = diag(obj.Fsm(:, 1));
-            v(:, 1) = (obj.Y + obj.H * Fsm_m) \ (obj.H * Fsm_m * obj.Vb);
-            i(:, 1) = Fsm_m * (obj.Vb - v(:, 1));
+            Fsm         = diag(obj.Fs(:, 1));
+            v(:, 1)     = (obj.W0 + obj.H0 * Fsm) \ (obj.C_impr(:, :, 1) * [1; 1]);
+            i_int(:, 1) = Fsm * v(:, 1);
 
             for m = 2 : obj.m_max
-                Fsm_m = diag(obj.Fsm(:, m));
-                C     = obj.compute_C(i(:, 1 : m - 1), v(:, 1 : m - 1), obj.h(:, :, 2 : m));
+                Fsm     = diag(obj.Fs(:, m));
+                Cm_int  = obj.compute_Cm_int(i_int(:, 1 : m - 1), obj.h(:, :, 2 : m));
+                Cm_v    = obj.compute_Cm_v(v(:, 1 : m - 1), obj.w(1, 2 : m));
 
-                v(:, m) = obj.compute_vm(obj.alpha, obj.Y, obj.H, Fsm_m, i(:, m - 1), obj.Vb, C);
-                i(:, m) = obj.compute_im(obj.alpha, i(:, m - 1), obj.Vb, v(:, m), Fsm_m);
+                v(:, m)     = obj.compute_vm(obj.alpha, obj.W0, obj.H0, Fsm, i_int(:, m - 1), ...
+                                             obj.C_impr(:, :, m), Cm_int, Cm_v);
+                i_int(:, m) = obj.compute_im_int(obj.alpha, i_int(:, m - 1), v(:, m), Fsm);
             end
+
+            i = obj.i_impr - i_int;
         end
     end
 
     methods (Static)
-        function Fsm = compute_Fsm(t, K, sigma_t, tau_c, tau_d)
+        function Fs = compute_Fs(t, K, sigma_t, tau_c, tau_d)
             %COMPUTE_FSM Summary of this method goes here
             %   Detailed explanation goes here
 
@@ -132,7 +147,7 @@ classdef TimeStepCoupling < handle
                 Fsm_2(m) = sum(exp(- 0.5 * ( (t(1 : m) - tau_d2) / sigma_t ) .^ 2) .* pcm_response);
             end
 
-            Fsm = (dt ^ 2) * K * [Fsm_1; Fsm_2];
+            Fs = (dt ^ 2) * K * [Fsm_1; Fsm_2];
         end
 
         function i_impr = compute_i_impr(t, Vb, K, sigma_t, tau_c, tau_d, tau_s)
@@ -152,42 +167,60 @@ classdef TimeStepCoupling < handle
                 pcm_response  = exp(- (t(m) - t(1 : m)) / tau_c);
                 scat_response = (1 - exp(- (t(m) - t(1 : m)) / tau_s));
 
-                i_impr_1(m) = sum(exp(- 0.5 * ( (t(1 : m) - tau_d1) / sigma_t ) ^ 2) ...
+                i_impr_1(m) = sum(exp(- 0.5 * ( (t(1 : m) - tau_d1) / sigma_t ) .^ 2) ...
                                   .* pcm_response .* scat_response);
-                i_impr_2(m) = sum(exp(- 0.5 * ( (t(1 : m) - tau_d2) / sigma_t ) ^ 2) ...
+                i_impr_2(m) = sum(exp(- 0.5 * ( (t(1 : m) - tau_d2) / sigma_t ) .^ 2) ...
                                   .* pcm_response .* scat_response);
             end
 
-            i_impr = dt * tau_s * Vb * K * [i_impr_1; i_impr_2];
+            i_impr = dt * tau_s * K * Vb .* [i_impr_1; i_impr_2];
         end
 
-        function vm = compute_vm(alpha, Y, H, Fsm_m, ip, Vb, C)
+        function C_impr = compute_C_impr(i_impr, h)
+            %COMPUTE_C_IMPR Summary of this method goes here
+            %   Detailed explanation goes here
+
+            m_max  = size(i_impr, 2);
+            C_impr = NaN(2, 2, m_max);
+
+            h      = permute(h, [2 3 1]);
+            i_impr = repmat(i_impr, [1 1 2]);
+
+            parfor m = 1 : m_max
+                C_impr(:, :, m) = permute(sum(i_impr(:, 1 : m, :) .* fliplr(h(:, 1 : m, :)), 2), [3 1 2]);
+            end
+        end
+
+        function Cm_int = compute_Cm_int(i_int, h)
+            %COMPUTE_CM_INT Summary of this method goes here
+            %   Detailed explanation goes here
+
+            h     = permute(h, [2 3 1]);
+            i_int = repmat(i_int, [1 1 2]);
+
+            Cm_int = permute(sum(i_int .* fliplr(h), 2), [3 1 2]);
+        end
+
+        function Cm_v = compute_Cm_v(v, w)
+            %COMPUTE_CM_V Summary of this method goes here
+            %   Detailed explanation goes here
+
+            w    = repmat(w, [2 1]);
+            Cm_v = sum(v .* fliplr(w), 2);
+        end
+
+        function vm = compute_vm(alpha, W0, H0, Fsm, ip_int, Cm_impr, Cm_int, Cm_v)
             %COMPUTE_VM Summary of this method goes here
             %   Detailed explanation goes here
 
-            vm = (Y + H * Fsm_m) \ (alpha * H * ip + H * Fsm_m * Vb + C);
+            vm = (W0 + H0 * Fsm) \ ((Cm_impr - Cm_int) * [1; 1] - alpha * H0 * ip_int - Cm_v);
         end
 
-        function im = compute_im(alpha, ip, Vb, vm, Fsm_m)
+        function im_int = compute_im_int(alpha, ip, vm, Fsm)
             %COMPUTE_IM Summary of this method goes here
             %   Detailed explanation goes here
             
-            im = alpha * ip + Fsm_m * (Vb - vm);
-        end
-
-        function C = compute_C(i, v, h)
-            %COMPUTE_C Summary of this method goes here
-            %   Detailed explanation goes here
-
-            Ci    = NaN(2, 1);
-            Ci(1) = sum(i(1, :) .* fliplr(permute(h(2, 1, :), [1 3 2])));
-            Ci(2) = sum(i(2, :) .* fliplr(permute(h(1, 2, :), [1 3 2])));
-
-            Cv    = NaN(2, 1);
-            Cv(1) = sum(v(1, :) .* fliplr(permute(h(1, 1, :), [1 3 2])));
-            Cv(2) = sum(v(2, :) .* fliplr(permute(h(2, 2, :), [1 3 2])));
-
-            C = Ci - Cv;
+            im_int = alpha * ip + Fsm * vm;
         end
     end
 end
