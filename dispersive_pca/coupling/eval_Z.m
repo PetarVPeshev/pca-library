@@ -4,7 +4,7 @@ function Z = eval_Z(f, slot, d_feed)
     arguments
         f      (1,:) double {mustBePositive}
         slot         SlotInDielectrics
-        d_feed (1,1) double {mustBePositive}
+        d_feed (1,1) double {mustBeReal}
     end
     
     Zin = slot.compute_zin(f);

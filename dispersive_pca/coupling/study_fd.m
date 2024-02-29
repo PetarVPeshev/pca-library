@@ -86,7 +86,7 @@ hold on;
           plot(f * 1e-12, imag(permute(H(1, 2, :), [1 3 2])), '--', 'LineWidth', 1.5, 'Color', '#A2142F');
 
 grid on;
-LGND1 = legend(PLTS, {'Y_{11} = Y_{22}', 'Z_{12} / Z_{11} = Z_{21} / Z_{22}'}, 'location', 'bestoutside');
+LGND1 = legend(PLTS, {'1 / Z_{11} = 1 / Z_{22}', 'Z_{12} / Z_{11} = Z_{21} / Z_{22}'}, 'location', 'bestoutside');
 hold on;
 
 AX2 = copyobj(AX1, gcf);
@@ -114,7 +114,7 @@ figure('Position', [250 250 950 450]);
 
 subplot(2, 1, 1);
 plot(tres * 1e12, permute(h(1, 1, :), [1 3 2]), 'LineWidth', 1.5, 'Color', '#0072BD', ...
-     'DisplayName', 'y_{11} = y_{22}');
+     'DisplayName', '1 / z_{11} = 1 / z_{22}');
 
 grid on;
 xlim([0 4]);

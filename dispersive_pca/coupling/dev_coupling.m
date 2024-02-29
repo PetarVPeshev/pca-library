@@ -7,26 +7,45 @@ sim_params;
 
 %% PARAMETERS
 % SLOT
-ws     = 10 * 1e-6;   % SLOT WIDTH    : 10 um
-d_gap  = 10 * 1e-6;   % FEED WIDTH    : 10 um
-d_feed = 100 * 1e-6;  % FEED DISTANCE : 100 um
+ws     = 10 * 1e-6;          % SLOT WIDTH      : 10 um
+d_gap  = 10 * 1e-6;          % FEED WIDTH      : 10 um
+d_feed = 100 * 1e-6;         % FEED DISTANCE   : 100 um (distance b/n feeds)
+x_lims = [-100 100] * 1e-6;  % DISTANCE LIMITS : -200 um to 200 um
+dx     = 10 * 1e-6;          % DISTANCE STEP   : 10 um
 % PHOTO-CONDUCTORS
-Vb    = [30; 0];            % BIAS VOLTAGE  : 30 V & 0 V
-tau_d = [0 0] * 1e-12;    % EXCITATION DELAY : 0 ps & 0 ps
+Vb    = [30; 0];            % BIAS VOLTAGE     : 30 V & 0 V
+tau_d = [0 1] * 1e-12;      % EXCITATION DELAY : 0 ps & 0 ps
 % LASER
 P = 10 * 1e-3;  % AVERAGE POWER : 10 mW
 % SIMULATION TIME
-t_lims = [-1 10] * 1e-12;   % TIME LIMITS : -1 ps to 10 ps
-dt     = 0.5 * 1e-15;       % TIME STEP   : 0.5 fs
+t_lims = [-1 10] * 1e-12;         % TIME LIMITS : -1 ps to 10 ps
+dt     = 0.5 * 1e-15;             % TIME STEP   : 0.5 fs
+t_plot = [5e-2 1 1.5 2] * 1e-12;  % PLOT TIME   : 5 fs, 1 ps, and 1.5 ps
 % FREQUENCY DOMAIN
 Nf     = 4001;          % FREQUENCY POINTS : 4001
 f_lims = [1e9 3e12];    % FREQUENCY LIMITS : 1 MHz to 3 THz
 
-%% FREQUENCY & TIME VECTORS
+%% FREQUENCY, TIME, & SLOT POSITION VECTORS
 mustBeIncreasing(f_lims);
+mustBeIncreasing(x_lims);
 f            = linspace(f_lims(1), f_lims(2), Nf);
 [tsim, tres] = create_time_arrays(dt, t_lims);
 Nt           = length(tsim);
+x            = x_lims(1) : dx : x_lims(2);
+Nx           = length(x);
+
+%% TIME INDEX PLOT
+Nt_plot = length(t_plot);
+t_idx   = NaN(1, Nt_plot);
+for idx = 1 : Nt_plot
+    t_idx(idx) = find(round(tsim * 1e12, 4) == t_plot(idx) * 1e12, 1);
+end
+
+%% FEED INDEX
+x_idx = NaN(1, 2);
+for idx = 1 : 2
+    x_idx(idx) = find(round(x * 1e6) == round(((-1) ^ idx) * d_feed * 1e6 / 2), 1);
+end
 
 %% OBJECTS
 slot  = create_slot(params_slot, 'd_gap', d_gap, 'ws', ws);
@@ -183,12 +202,26 @@ time_step.sigma_t = laser.sigma_t;
 
 % Voltage and currents
 [v, i] = time_step.simulate();
-i_impr = time_step.i_impr;
-i_int  = i_impr - i;
+
+laser_envelope = exp(- 0.5 * ( (tsim - tau_d') / laser.sigma_t) .^ 2) * laser.P0;
 
 figure('Position', [250 250 1050 550]);
 
-subplot(2, 1, 1);
+subplot(3, 1, 1);
+plot(tsim * 1e12, laser_envelope(1, :) * 1e-3, 'LineWidth', 1.5, 'Color', '#0072BD', ...
+     'DisplayName', 'P_{L1}');
+hold on;
+plot(tsim * 1e12, laser_envelope(2, :) * 1e-3, '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
+     'DisplayName', 'P_{L2}');
+
+grid on;
+xlim([-0.3 2.5]);
+ylim([0 1.5]);
+legend('location', 'bestoutside');
+
+ylabel('P_{L} [kW]');
+
+subplot(3, 1, 2);
 plot(tsim * 1e12, v(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', 'DisplayName', 'v_{1}');
 hold on;
 plot(tsim * 1e12, v(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayName', 'v_{2}');
@@ -200,17 +233,94 @@ legend('location', 'bestoutside');
 
 ylabel('v [V]');
 
-subplot(2, 1, 2);
+subplot(3, 1, 3);
 plot(tsim * 1e12, i(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', 'DisplayName', 'i_{1}');
 hold on;
 plot(tsim * 1e12, i(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayName', 'i_{2}');
 
 grid on;
 xlim([-0.3 2.5]);
-% ylim([0 0.2]);
+ylim([-0.05 0.25]);
 legend('location', 'bestoutside');
 
 ylabel('i [A]');
+xlabel('t [ps]');
+sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
+        num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], 'FontSize', 11, ...
+        'FontWeight', 'bold');
+
+%% WAVE ALONG SLOT
+vx                   = NaN(Nx, Nt, 2);
+[vx(:, :, 1), ~, Wx] = eval_vx(i(1, :), 'x', x, 't_res', tres, 'f', f, 'slot', slot, 'x_feed', - d_feed / 2);
+[vx(:, :, 2), ~, ~]  = eval_vx(i(2, :), 'x', x, 't_res', tres, 'f', f, 'slot', slot, 'x_feed', d_feed / 2, ...
+                               'w', Wx);
+
+figure('Position', [250 250 850 550]);
+
+for idx = 1 : Nt_plot
+    subplot(Nt_plot, 1, idx);
+    plot(x * 1e6, vx(:, t_idx(idx), 1)', 'LineWidth', 1.5, 'Color', '#0072BD');
+    hold on;
+    plot(- d_feed * 1e6 / 2, 0, 'm*', 'LineWidth', 3.0);
+    hold on;
+    plot(d_feed * 1e6 / 2,  0, 'm*', 'LineWidth', 3.0);
+    
+    grid on;
+    ylim([-3 12.5]);
+    yticks(-3 : 3 : 12);
+    
+    ylabel('v_{s} [V]');
+    title(['@ t = ' num2str(t_plot(idx) * 1e12) ' ps']);
+end
+
+xlabel('x [\mum]');
+sgtitle(['SELF VOLTAGE @ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ...
+         ' \mum, d_{x} = ' num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], ...
+         'FontSize', 11, 'FontWeight', 'bold');
+
+figure('Position', [250 250 850 550]);
+
+for idx = 1 : Nt_plot
+    subplot(Nt_plot, 1, idx);
+    plot(x * 1e6, vx(:, t_idx(idx), 2)', 'LineWidth', 1.5, 'Color', '#A2142F');
+    hold on;
+    plot(- d_feed * 1e6 / 2, 0, 'm*', 'LineWidth', 3.0);
+    hold on;
+    plot(d_feed * 1e6 / 2,  0, 'm*', 'LineWidth', 3.0);
+    
+    grid on;
+    ylim([-3 12.5]);
+    yticks(-3 : 3 : 12);
+    
+    ylabel('v_{m} [V]');
+    title(['@ t = ' num2str(t_plot(idx) * 1e12) ' ps']);
+end
+
+xlabel('x [\mum]');
+sgtitle(['MUTUAL VOLTAGE @ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ...
+         ' \mum, d_{x} = ' num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], ...
+         'FontSize', 11, 'FontWeight', 'bold');
+
+figure('Position', [250 250 950 550]);
+
+for idx = 1 : 2
+    subplot(2, 1, idx);
+    plot(tsim * 1e12, vx(x_idx(idx), :, 1), 'LineWidth', 1.5, 'Color', '#0072BD', ...
+         'DisplayName', 'v_{s}');
+    hold on;
+    plot(tsim * 1e12, vx(x_idx(idx), :, 2), '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
+         'DisplayName', 'v_{m}');
+    
+    grid on;
+    xlim([-0.3 2.5]);
+    ylim([-3 12.5]);
+    yticks(-3 : 3 : 12);
+    legend('location', 'bestoutside');
+    
+    ylabel('v [V]');
+    title(['FEED ' num2str(idx)]);
+end
+
 xlabel('t [ps]');
 sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
         num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], 'FontSize', 11, ...
