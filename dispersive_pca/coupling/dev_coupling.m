@@ -13,7 +13,7 @@ d_feed = 100 * 1e-6;         % FEED DISTANCE   : 100 um (distance b/n feeds)
 x_lims = [-100 100] * 1e-6;  % DISTANCE LIMITS : -200 um to 200 um
 dx     = 10 * 1e-6;          % DISTANCE STEP   : 10 um
 % PHOTO-CONDUCTORS
-Vb    = [30; 0];            % BIAS VOLTAGE     : 30 V & 0 V
+Vb    = 30;                 % BIAS VOLTAGE     : 30 V
 tau_d = [0 1] * 1e-12;      % EXCITATION DELAY : 0 ps & 0 ps
 % LASER
 P = 10 * 1e-3;  % AVERAGE POWER : 10 mW

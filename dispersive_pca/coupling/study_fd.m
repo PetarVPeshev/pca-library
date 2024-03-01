@@ -136,7 +136,7 @@ sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) 
         num2str(d_feed * 1e6) ' \mum'], 'FontSize', 11, 'FontWeight', 'bold');
 
 %% TIME-STEP ALGORITHM
-time_step = TimeStepCoupling(tsim);
+time_step = TimeStep3(tsim);
 
 % Set time-step algorithm parameters
 time_step.K       = calculate_K(laser, pcm);

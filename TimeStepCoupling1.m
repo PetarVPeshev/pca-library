@@ -10,7 +10,7 @@ classdef TimeStepCoupling1 < handle
 
     properties
         K           (1,1)   double
-        Vb          (2,1)   double
+        Vb          (1,1)   double
         w           (1,:)   double
         h           (2,2,:) double
         tau_c       (1,1)   double
@@ -23,7 +23,7 @@ classdef TimeStepCoupling1 < handle
         W0          (2,2) double
         H0          (2,2) double
         Fs          (2,:) double
-        i_impr      (2,:) double
+        i_impr      (1,:) double
         C_impr      (2,2,:) double
         alpha       (1,1) double
     end
@@ -36,7 +36,7 @@ classdef TimeStepCoupling1 < handle
             arguments
                 t               (1,:)   double
                 params.K        (1,1)   double = 0
-                params.Vb       (2,1)   double = zeros(2, 1)
+                params.Vb       (1,1)   double = 0
                 params.w        (1,:)   double = double.empty(1, 0)
                 params.h        (2,2,:) double = double.empty(2, 2, 0)
                 params.tau_c    (1,1)   double = 0
@@ -67,7 +67,7 @@ classdef TimeStepCoupling1 < handle
             obj.H0     = obj.h(:, :, 1);
             
             obj.Fs     = obj.compute_Fs(obj.t, obj.K, obj.sigma_t, obj.tau_c, obj.tau_d);
-            obj.i_impr = obj.compute_i_impr(obj.t, obj.Vb, obj.K, obj.sigma_t, obj.tau_c, obj.tau_d, obj.tau_s);
+            obj.i_impr = obj.compute_i_impr(obj.t, obj.Vb, obj.K, obj.sigma_t, obj.tau_c, obj.tau_d(1), obj.tau_s);
             obj.C_impr = obj.compute_C_impr(obj.i_impr, obj.h);
             obj.alpha  = exp(- obj.dt / obj.tau_c) * exp(- obj.dt / obj.tau_s);
         end
@@ -78,7 +78,7 @@ classdef TimeStepCoupling1 < handle
             obj.H0     = zeros(2, 2);
 
             obj.Fs     = zeros(2, obj.m_max);
-            obj.i_impr = zeros(2, obj.m_max);
+            obj.i_impr = zeros(1, obj.m_max);
             obj.C_impr = zeros(2, 2, obj.m_max);
             obj.alpha  = 0;
         end
@@ -87,11 +87,11 @@ classdef TimeStepCoupling1 < handle
             % Validate related or interdependent property values
 
             mustBeValidTimeStepScalar(obj.K);
+            mustBeValidTimeStepScalar(obj.Vb);
             mustBeValidTimeStepScalar(obj.tau_c);
             mustBeValidTimeStepScalar(obj.tau_s);
             mustBeValidTimeStepScalar(obj.sigma_t);
 
-            mustBeValidTimeStepMatrix(obj.Vb,    [2 1]);
             mustBeValidTimeStepMatrix(obj.w,     [1 obj.m_max]);
             mustBeValidTimeStepMatrix(obj.h,     [2 2 obj.m_max]);
             mustBeValidTimeStepMatrix(obj.tau_d, [1 2]);
@@ -157,23 +157,17 @@ classdef TimeStepCoupling1 < handle
             m_max  = length(t);
             dt     = t(2) - t(1);
 
-            tau_d1 = tau_d(1);
-            tau_d2 = tau_d(2);
-
-            i_impr_1 = NaN(1, m_max);
-            i_impr_2 = i_impr_1;
+            i_impr = NaN(1, m_max);
 
             parfor m = 1 : m_max
                 pcm_response  = exp(- (t(m) - t(1 : m)) / tau_c);
                 scat_response = (1 - exp(- (t(m) - t(1 : m)) / tau_s));
 
-                i_impr_1(m) = sum(exp(- 0.5 * ( (t(1 : m) - tau_d1) / sigma_t ) .^ 2) ...
-                                  .* pcm_response .* scat_response);
-                i_impr_2(m) = sum(exp(- 0.5 * ( (t(1 : m) - tau_d2) / sigma_t ) .^ 2) ...
+                i_impr(m) = sum(exp(- 0.5 * ( (t(1 : m) - tau_d) / sigma_t ) .^ 2) ...
                                   .* pcm_response .* scat_response);
             end
 
-            i_impr = dt * tau_s * K * Vb .* [i_impr_1; i_impr_2];
+            i_impr = dt * tau_s * K * Vb * i_impr;
         end
 
         function C_impr = compute_C_impr(i_impr, h)
@@ -181,19 +175,23 @@ classdef TimeStepCoupling1 < handle
             %   Detailed explanation goes here
 
             m_max  = size(i_impr, 2);
-            C_impr = NaN(2, 2, m_max);
+            C_impr = NaN(2, m_max);
 
-            h      = permute(h, [2 3 1]);
-            i_impr = repmat(i_impr, [1 1 2]);
+            h      = squeeze(h(:, 1, :));
+            i_impr = repmat(i_impr, [2 1]);
 
             parfor m = 1 : m_max
-                C_impr(:, :, m) = permute(sum(i_impr(:, 1 : m, :) .* fliplr(h(:, 1 : m, :)), 2), [3 1 2]);
+                C_impr(:, m) = sum(i_impr(:, 1 : m) .* fliplr(h(:, 1 : m)), 2);
             end
         end
 
         function Cm_int = compute_Cm_int(i_int, h)
             %COMPUTE_CM_INT Summary of this method goes here
             %   Detailed explanation goes here
+            % TODO: left @ this point in modifying the algorithm
+
+            h = squeeze(h(:, 1, :));
+            i_int = repmat(i_int, );
 
             h     = permute(h, [2 3 1]);
             i_int = repmat(i_int, [1 1 2]);
