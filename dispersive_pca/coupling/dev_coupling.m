@@ -13,7 +13,7 @@ d_feed = 100 * 1e-6;         % FEED DISTANCE   : 100 um (distance b/n feeds)
 x_lims = [-100 100] * 1e-6;  % DISTANCE LIMITS : -200 um to 200 um
 dx     = 10 * 1e-6;          % DISTANCE STEP   : 10 um
 % PHOTO-CONDUCTORS
-Vb    = 30;                 % BIAS VOLTAGE     : 30 V
+Vb    = [30; 0];            % BIAS VOLTAGE     : 30 V
 tau_d = [0 1] * 1e-12;      % EXCITATION DELAY : 0 ps & 0 ps
 % LASER
 P = 10 * 1e-3;  % AVERAGE POWER : 10 mW
@@ -188,7 +188,7 @@ sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) 
         num2str(d_feed * 1e6) ' \mum'], 'FontSize', 11, 'FontWeight', 'bold');
 
 %% TIME-STEP ALGORITHM
-time_step = TimeStepCoupling1(tsim);
+time_step = TimeStep1(tsim);
 
 % Set time-step algorithm parameters
 time_step.K       = calculate_K(laser, pcm);
@@ -240,7 +240,7 @@ plot(tsim * 1e12, i(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayN
 
 grid on;
 xlim([-0.3 2.5]);
-ylim([-0.05 0.25]);
+ylim([-0.1 0.4]);
 legend('location', 'bestoutside');
 
 ylabel('i [A]');
@@ -249,79 +249,101 @@ sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) 
         num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], 'FontSize', 11, ...
         'FontWeight', 'bold');
 
-%% WAVE ALONG SLOT
-vx                   = NaN(Nx, Nt, 2);
-[vx(:, :, 1), ~, Wx] = eval_vx(i(1, :), 'x', x, 't_res', tres, 'f', f, 'slot', slot, 'x_feed', - d_feed / 2);
-[vx(:, :, 2), ~, ~]  = eval_vx(i(2, :), 'x', x, 't_res', tres, 'f', f, 'slot', slot, 'x_feed', d_feed / 2, ...
-                               'w', Wx);
+%% ENERGY
+Pi = v .* i;
+E  = sum(Pi, 2) * dt;
 
-figure('Position', [250 250 850 550]);
+fig = figure('Position', [250 250 950 450]);
 
-for idx = 1 : Nt_plot
-    subplot(Nt_plot, 1, idx);
-    plot(x * 1e6, vx(:, t_idx(idx), 1)', 'LineWidth', 1.5, 'Color', '#0072BD');
-    hold on;
-    plot(- d_feed * 1e6 / 2, 0, 'm*', 'LineWidth', 3.0);
-    hold on;
-    plot(d_feed * 1e6 / 2,  0, 'm*', 'LineWidth', 3.0);
-    
-    grid on;
-    ylim([-3 12.5]);
-    yticks(-3 : 3 : 12);
-    
-    ylabel('v_{s} [V]');
-    title(['@ t = ' num2str(t_plot(idx) * 1e12) ' ps']);
-end
+plot(tsim * 1e12, Pi(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', ...
+     'DisplayName', ['p_{1}, E_{1} = ' num2str(round(E(1) * 1e12, 2)) ' pJ']);
+hold on;
+plot(tsim * 1e12, Pi(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
+     'DisplayName', ['p_{2}, E_{2} = ' num2str(round(E(2) * 1e12, 2)) ' pJ']);
 
-xlabel('x [\mum]');
-sgtitle(['SELF VOLTAGE @ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ...
-         ' \mum, d_{x} = ' num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], ...
-         'FontSize', 11, 'FontWeight', 'bold');
-
-figure('Position', [250 250 850 550]);
-
-for idx = 1 : Nt_plot
-    subplot(Nt_plot, 1, idx);
-    plot(x * 1e6, vx(:, t_idx(idx), 2)', 'LineWidth', 1.5, 'Color', '#A2142F');
-    hold on;
-    plot(- d_feed * 1e6 / 2, 0, 'm*', 'LineWidth', 3.0);
-    hold on;
-    plot(d_feed * 1e6 / 2,  0, 'm*', 'LineWidth', 3.0);
-    
-    grid on;
-    ylim([-3 12.5]);
-    yticks(-3 : 3 : 12);
-    
-    ylabel('v_{m} [V]');
-    title(['@ t = ' num2str(t_plot(idx) * 1e12) ' ps']);
-end
-
-xlabel('x [\mum]');
-sgtitle(['MUTUAL VOLTAGE @ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ...
-         ' \mum, d_{x} = ' num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], ...
-         'FontSize', 11, 'FontWeight', 'bold');
-
-figure('Position', [250 250 950 550]);
-
-for idx = 1 : 2
-    subplot(2, 1, idx);
-    plot(tsim * 1e12, vx(x_idx(idx), :, 1), 'LineWidth', 1.5, 'Color', '#0072BD', ...
-         'DisplayName', 'v_{s}');
-    hold on;
-    plot(tsim * 1e12, vx(x_idx(idx), :, 2), '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
-         'DisplayName', 'v_{m}');
-    
-    grid on;
-    xlim([-0.3 2.5]);
-    ylim([-3 12.5]);
-    yticks(-3 : 3 : 12);
-    legend('location', 'bestoutside');
-    
-    ylabel('v [V]');
-    title(['FEED ' num2str(idx)]);
-end
+grid on;
+xlim([-0.3 2.5]);
+ylim([-0.5 3]);
+legend('location', 'bestoutside');
 
 xlabel('t [ps]');
-sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
-        num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], 'FontSize', 11, ...
-        'FontWeight', 'bold');
+ylabel('p [W]');
+title(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
+       num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs']);
+
+%% WAVE ALONG SLOT
+% vx                   = NaN(Nx, Nt, 2);
+% [vx(:, :, 1), ~, Wx] = eval_vx(i(1, :), 'x', x, 't_res', tres, 'f', f, 'slot', slot, 'x_feed', - d_feed / 2);
+% [vx(:, :, 2), ~, ~]  = eval_vx(i(2, :), 'x', x, 't_res', tres, 'f', f, 'slot', slot, 'x_feed', d_feed / 2, ...
+%                                'w', Wx);
+% 
+% figure('Position', [250 250 850 550]);
+% 
+% for idx = 1 : Nt_plot
+%     subplot(Nt_plot, 1, idx);
+%     plot(x * 1e6, vx(:, t_idx(idx), 1)', 'LineWidth', 1.5, 'Color', '#0072BD');
+%     hold on;
+%     plot(- d_feed * 1e6 / 2, 0, 'm*', 'LineWidth', 3.0);
+%     hold on;
+%     plot(d_feed * 1e6 / 2,  0, 'm*', 'LineWidth', 3.0);
+%     
+%     grid on;
+%     ylim([-3 12.5]);
+%     yticks(-3 : 3 : 12);
+%     
+%     ylabel('v_{s} [V]');
+%     title(['@ t = ' num2str(t_plot(idx) * 1e12) ' ps']);
+% end
+% 
+% xlabel('x [\mum]');
+% sgtitle(['SELF VOLTAGE @ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ...
+%          ' \mum, d_{x} = ' num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], ...
+%          'FontSize', 11, 'FontWeight', 'bold');
+% 
+% figure('Position', [250 250 850 550]);
+% 
+% for idx = 1 : Nt_plot
+%     subplot(Nt_plot, 1, idx);
+%     plot(x * 1e6, vx(:, t_idx(idx), 2)', 'LineWidth', 1.5, 'Color', '#A2142F');
+%     hold on;
+%     plot(- d_feed * 1e6 / 2, 0, 'm*', 'LineWidth', 3.0);
+%     hold on;
+%     plot(d_feed * 1e6 / 2,  0, 'm*', 'LineWidth', 3.0);
+%     
+%     grid on;
+%     ylim([-3 12.5]);
+%     yticks(-3 : 3 : 12);
+%     
+%     ylabel('v_{m} [V]');
+%     title(['@ t = ' num2str(t_plot(idx) * 1e12) ' ps']);
+% end
+% 
+% xlabel('x [\mum]');
+% sgtitle(['MUTUAL VOLTAGE @ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ...
+%          ' \mum, d_{x} = ' num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], ...
+%          'FontSize', 11, 'FontWeight', 'bold');
+% 
+% figure('Position', [250 250 950 550]);
+% 
+% for idx = 1 : 2
+%     subplot(2, 1, idx);
+%     plot(tsim * 1e12, vx(x_idx(idx), :, 1), 'LineWidth', 1.5, 'Color', '#0072BD', ...
+%          'DisplayName', 'v_{s}');
+%     hold on;
+%     plot(tsim * 1e12, vx(x_idx(idx), :, 2), '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
+%          'DisplayName', 'v_{m}');
+%     
+%     grid on;
+%     xlim([-0.3 2.5]);
+%     ylim([-3 12.5]);
+%     yticks(-3 : 3 : 12);
+%     legend('location', 'bestoutside');
+%     
+%     ylabel('v [V]');
+%     title(['FEED ' num2str(idx)]);
+% end
+% 
+% xlabel('t [ps]');
+% sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
+%         num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], 'FontSize', 11, ...
+%         'FontWeight', 'bold');

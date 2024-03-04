@@ -1,4 +1,4 @@
-classdef TimeStepCoupling1 < handle
+classdef TimeStepCoupling2 < handle
     % TimeStepAlgorithmCoupling Add summary here
     %   Detailed explanation goes here
 
@@ -23,13 +23,11 @@ classdef TimeStepCoupling1 < handle
         W0          (2,2) double
         H0          (2,2) double
         Fs          (2,:) double
-        i_impr      (1,:) double
-        C_impr      (2,:) double
         alpha       (1,1) double
     end
 
     methods
-        function obj = TimeStepCoupling1(t, params)
+        function obj = TimeStepCoupling2(t, params)
             % Support name-value pair arguments when constructing object
             %   Detailed explanation goes here
 
@@ -67,8 +65,6 @@ classdef TimeStepCoupling1 < handle
             obj.H0     = obj.h(:, :, 1);
             
             obj.Fs     = obj.compute_Fs(obj.t, obj.K, obj.sigma_t, obj.tau_c, obj.tau_d);
-            obj.i_impr = obj.compute_i_impr(obj.t, obj.Vb, obj.K, obj.sigma_t, obj.tau_c, obj.tau_d(1), obj.tau_s);
-            obj.C_impr = obj.compute_C_impr(obj.i_impr, obj.h);
             obj.alpha  = exp(- obj.dt / obj.tau_c) * exp(- obj.dt / obj.tau_s);
         end
 
@@ -78,8 +74,6 @@ classdef TimeStepCoupling1 < handle
             obj.H0     = zeros(2, 2);
 
             obj.Fs     = zeros(2, obj.m_max);
-            obj.i_impr = zeros(1, obj.m_max);
-            obj.C_impr = zeros(2, obj.m_max);
             obj.alpha  = 0;
         end
 
@@ -104,33 +98,23 @@ classdef TimeStepCoupling1 < handle
             obj.reset();
             obj.setup();
 
-            T = [-1 0; 0 1];
-
-            v     = NaN(2, obj.m_max);
-            i     = zeros(2, obj.m_max);
-            i_int = zeros(1, obj.m_max);
+            v = NaN(2, obj.m_max);
+            i = v;
 
             % Initial conditions
-            Fsm      = diag(obj.Fs(:, 1));
-            v(:, 1)  = (obj.W0 - obj.H0 * Fsm * T) \ obj.C_impr(:, 1);
-            i_int(1) = Fsm(1, 1) * v(1, 1);
-            i(2, 1)  = Fsm(2, 2) * v(2, 1);
+            Fsm     = diag(obj.Fs(:, 1));
+            v(:, 1) = obj.compute_vm(obj.alpha, obj.Vb, obj.W0, obj.H0, Fsm, [0; 0], [0 0; 0 0], [0; 0]);
+            i(:, 1) = obj.compute_im(obj.alpha, obj.Vb, [0; 0], v(:, 1), Fsm);
 
             for m = 2 : obj.m_max
-                Fsm    = diag(obj.Fs(:, m));
+                Fsm = diag(obj.Fs(:, m));
 
-                Cm_int = obj.compute_Cm_int(i_int(1 : m - 1), obj.h(:, :, 2 : m));
-                Cm_i   = obj.compute_Cm_i(i(:, 1 : m - 1), obj.h(:, :, 2 : m));
-                Cm_v   = obj.compute_Cm_v(v(:, 1 : m - 1), obj.w(2 : m));
+                Cm_i = obj.compute_Cm_i(i(:, 1 : m - 1), obj.h(:, :, 2 : m));
+                Cm_v = obj.compute_Cm_v(v(:, 1 : m - 1), obj.w(:, 2 : m));  % REMOVE ROW SPECIFIER
 
-                v(:, m) = obj.compute_vm(obj.alpha, obj.W0, obj.H0, Fsm, i_int(m - 1), i(:, m - 1), ...
-                                         obj.C_impr(:, m), Cm_i, Cm_int, Cm_v);
-
-                i_int(m) = obj.compute_im_int(obj.alpha, i_int(m - 1), v(:, m), Fsm);
-                i(:, m)  = obj.compute_im(obj.alpha, i(:, m - 1), v(:, m), Fsm);
+                v(:, m) = obj.compute_vm(obj.alpha, obj.Vb, obj.W0, obj.H0, Fsm, i(:, m - 1), Cm_i, Cm_v);
+                i(:, m) = obj.compute_im(obj.alpha, obj.Vb, i(:, m - 1), v(:, m), Fsm);
             end
-
-            i(1, :) = obj.i_impr - i_int;
         end
     end
 
@@ -178,39 +162,14 @@ classdef TimeStepCoupling1 < handle
             i_impr = dt * tau_s * K * Vb * i_impr;
         end
 
-        function C_impr = compute_C_impr(i_impr, h)
-            %COMPUTE_C_IMPR Summary of this method goes here
-            %   Detailed explanation goes here
-
-            m_max  = size(i_impr, 2);
-            C_impr = NaN(2, m_max);
-
-            h      = squeeze(h(:, 1, :));
-            i_impr = repmat(i_impr, [2 1]);
-
-            parfor m = 1 : m_max
-                C_impr(:, m) = sum(i_impr(:, 1 : m) .* fliplr(h(:, 1 : m)), 2);
-            end
-        end
-
-        function Cm_int = compute_Cm_int(i_int, h)
-            %COMPUTE_CM_INT Summary of this method goes here
-            %   Detailed explanation goes here
-
-            h     = squeeze(h(:, 1, :));
-            i_int = repmat(i_int, [2 1]);
-
-            Cm_int = sum(i_int .* fliplr(h), 2);
-        end
-
         function Cm_i = compute_Cm_i(i, h)
             %COMPUTE_CM_I Summary of this method goes here
             %   Detailed explanation goes here
 
-            h = squeeze(h(:, 2, :));
-            i = repmat(i(2, :), [2 1]);
+            h = permute(h, [2 3 1]);
+            i = repmat(i, [1 1 2]);
 
-            Cm_i = sum(i .* fliplr(h), 2);
+            Cm_i = permute(sum(i .* fliplr(h), 2), [3 1 2]);
         end
 
         function Cm_v = compute_Cm_v(v, w)
@@ -222,28 +181,25 @@ classdef TimeStepCoupling1 < handle
             Cm_v = sum(v .* fliplr(w), 2);
         end
 
-        function vm = compute_vm(alpha, W0, H0, Fsm, ip_int, ip, Cm_impr, Cm_i, Cm_int, Cm_v)
+        function vm = compute_vm(alpha, Vb, W0, H0, Fsm, ip, Cm_i, Cm_v)
             %COMPUTE_VM Summary of this method goes here
             %   Detailed explanation goes here
 
-            T = [-1 0; 0 1];
+            T  = [-1 0; 0 1];
+            R  = [1; 1];
+            Vb = [Vb; 0];
 
-            vm = (W0 - H0 * Fsm * T) \ (Cm_impr + Cm_i - Cm_int - Cm_v - alpha * H0 * T * (ip_int + ip));
+            vm = (W0 - H0 * Fsm * T) \ (alpha * H0 * ip + H0 * Fsm * Vb + Cm_i * R - Cm_v);
         end
 
-        function im_int = compute_im_int(alpha, ip_int, vm, Fsm)
+        function im = compute_im(alpha, Vb, ip, vm, Fsm)
             %COMPUTE_IM Summary of this method goes here
             %   Detailed explanation goes here
-            
-            im_int = alpha * ip_int + Fsm(1, 1) * vm(1, 1);
-        end
 
-        function im = compute_im(alpha, ip, vm, Fsm)
-            %COMPUTE_IM Summary of this method goes here
-            %   Detailed explanation goes here
+            T  = [-1 0; 0 1];
+            Vb = [Vb; 0];
             
-            im    = zeros(2, 1);
-            im(2) = alpha * ip(2) + Fsm(2, 2) * vm(2);
+            im = alpha * ip + Fsm * Vb + Fsm * T * vm;
         end
     end
 end
