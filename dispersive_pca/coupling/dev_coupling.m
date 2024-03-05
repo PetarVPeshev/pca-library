@@ -13,7 +13,7 @@ d_feed = 100 * 1e-6;         % FEED DISTANCE   : 100 um (distance b/n feeds)
 x_lims = [-100 100] * 1e-6;  % DISTANCE LIMITS : -200 um to 200 um
 dx     = 10 * 1e-6;          % DISTANCE STEP   : 10 um
 % PHOTO-CONDUCTORS
-Vb    = [30; 0];            % BIAS VOLTAGE     : 30 V
+Vb    = [30; 0];            % BIAS VOLTAGE     : 30 V & 0 V
 tau_d = [0 1] * 1e-12;      % EXCITATION DELAY : 0 ps & 0 ps
 % LASER
 P = 10 * 1e-3;  % AVERAGE POWER : 10 mW
@@ -249,16 +249,16 @@ sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) 
         num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], 'FontSize', 11, ...
         'FontWeight', 'bold');
 
-%% ENERGY
-Pi = v .* i;
-E  = sum(Pi, 2) * dt;
+%% TOTAL ENERGY
+p = v .* i;
+E = sum(p, 2) * dt;
 
 fig = figure('Position', [250 250 950 450]);
 
-plot(tsim * 1e12, Pi(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', ...
+plot(tsim * 1e12, p(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', ...
      'DisplayName', ['p_{1}, E_{1} = ' num2str(round(E(1) * 1e12, 2)) ' pJ']);
 hold on;
-plot(tsim * 1e12, Pi(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
+plot(tsim * 1e12, p(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
      'DisplayName', ['p_{2}, E_{2} = ' num2str(round(E(2) * 1e12, 2)) ' pJ']);
 
 grid on;
@@ -270,6 +270,132 @@ xlabel('t [ps]');
 ylabel('p [W]');
 title(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
        num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs']);
+
+%% VOLTAGE CONTRIBUTIONS
+W_struct = struct('w', w, 'W', W);
+
+v_comp          = NaN(2, Nt, 2);
+v_comp(1, :, 1) = eval_vx(i(1, :), 'h', struct('h', permute(h(1, 1, :), [1 3 2])), 'w', W_struct);
+v_comp(2, :, 1) = eval_vx(i(1, :), 'h', struct('h', permute(h(2, 1, :), [1 3 2])), 'w', W_struct);
+v_comp(1, :, 2) = eval_vx(i(2, :), 'h', struct('h', permute(h(1, 2, :), [1 3 2])), 'w', W_struct);
+v_comp(2, :, 2) = eval_vx(i(2, :), 'h', struct('h', permute(h(2, 2, :), [1 3 2])), 'w', W_struct);
+
+figure('Position', [250 250 1050 550]);
+
+subplot(2, 2, 1);
+plot(tsim * 1e12, v_comp(1, :, 1), 'LineWidth', 1.5, 'Color', '#0072BD', 'DisplayName', 'v_{1}^{s}');
+
+grid on;
+xlim([-0.3 2.5]);
+ylim([-3 15]);
+
+ylabel('v [V]');
+title("$$ \int_{-\infty}^{t}i_{1}(t^{'})z_{11}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+      'FontWeight', 'bold');
+
+subplot(2, 2, 2);
+plot(tsim * 1e12, v_comp(1, :, 2), '--', 'LineWidth', 1.5, 'Color', '#0072BD', 'DisplayName', 'v_{1}^{m}');
+
+grid on;
+xlim([-0.3 2.5]);
+ylim([-3 15]);
+
+title("$$ \int_{-\infty}^{t}i_{2}(t^{'})z_{12}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+      'FontWeight', 'bold');
+
+subplot(2, 2, 3);
+plot(tsim * 1e12, v_comp(2, :, 1), '--', 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayName', 'v_{2}^{s}');
+
+grid on;
+xlim([-0.3 2.5]);
+ylim([-3 15]);
+
+ylabel('v [V]');
+xlabel('t [ps]');
+title("$$ \int_{-\infty}^{t}i_{1}(t^{'})z_{21}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+      'FontWeight', 'bold');
+
+subplot(2, 2, 4);
+plot(tsim * 1e12, v_comp(2, :, 2), 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayName', 'v_{2}^{m}');
+
+grid on;
+xlim([-0.3 2.5]);
+ylim([-3 15]);
+
+xlabel('t [ps]');
+title("$$ \int_{-\infty}^{t}i_{2}(t^{'})z_{22}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+      'FontWeight', 'bold');
+
+sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
+        num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], 'FontSize', 11, ...
+        'FontWeight', 'bold');
+
+%% INSTANTANEOUS POWER COMPONENTS
+p_comp = NaN(2, Nt, 2);
+p_comp(1, :, 1) = v_comp(1, :, 1) .* i(1, :);
+p_comp(1, :, 2) = v_comp(1, :, 2) .* i(1, :);
+p_comp(2, :, 1) = v_comp(2, :, 1) .* i(2, :);
+p_comp(2, :, 2) = v_comp(2, :, 2) .* i(2, :);
+
+E_comp = permute(sum(p_comp, 2) * dt, [1 3 2]);
+
+figure('Position', [250 250 1250 550]);
+
+subplot(2, 2, 1);
+plot(tsim * 1e12, p_comp(1, :, 1), 'LineWidth', 1.5, 'Color', '#0072BD', ...
+     'DisplayName', ['p_{in}, E_{in} = ' num2str(round(E_comp(1, 1) * 1e12, 2)) ' pJ']);
+
+grid on;
+xlim([-0.3 2.5]);
+ylim([-0.5 3]);
+legend('location', 'bestoutside');
+
+ylabel('p [W]');
+title("$$ i_{1}(t)\int_{-\infty}^{t}i_{1}(t^{'})z_{11}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+      'FontWeight', 'bold');
+
+subplot(2, 2, 2);
+plot(tsim * 1e12, p_comp(1, :, 2), '--', 'LineWidth', 1.5, 'Color', '#0072BD', ...
+     'DisplayName', ['p_{1}^{ind}, E_{1}^{ind} = ' num2str(round(E_comp(1, 2) * 1e12, 2)) ' pJ']);
+
+grid on;
+xlim([-0.3 2.5]);
+ylim([-0.5 3]);
+legend('location', 'bestoutside');
+
+title("$$ i_{1}(t)\int_{-\infty}^{t}i_{2}(t^{'})z_{12}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+      'FontWeight', 'bold');
+
+subplot(2, 2, 3);
+plot(tsim * 1e12, p_comp(2, :, 1), '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
+     'DisplayName', ['p_{2}^{ind}, E_{2}^{ind} = ' num2str(round(E_comp(2, 1) * 1e12, 2)) ' pJ']);
+
+grid on;
+xlim([-0.3 2.5]);
+ylim([-0.5 3]);
+legend('location', 'bestoutside');
+
+ylabel('p [W]');
+xlabel('t [ps]');
+title("$$ i_{2}(t)\int_{-\infty}^{t}i_{1}(t^{'})z_{21}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+      'FontWeight', 'bold');
+
+subplot(2, 2, 4);
+plot(tsim * 1e12, p_comp(2, :, 2), 'LineWidth', 1.5, 'Color', '#A2142F', ...
+     'DisplayName', ['p_{m}, E_{m} = ' num2str(round(E_comp(2, 2) * 1e12, 2)) ' pJ']);
+
+grid on;
+xlim([-0.3 2.5]);
+ylim([-0.5 3]);
+legend('location', 'bestoutside');
+
+xlabel('t [ps]');
+title("$$ i_{2}(t)\int_{-\infty}^{t}i_{2}(t^{'})z_{22}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+      'FontWeight', 'bold');
+
+sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
+        num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], 'FontSize', 11, ...
+        'FontWeight', 'bold');
 
 %% WAVE ALONG SLOT
 % vx                   = NaN(Nx, Nt, 2);
