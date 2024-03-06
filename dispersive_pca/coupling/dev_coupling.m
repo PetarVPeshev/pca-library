@@ -10,7 +10,7 @@ sim_params;
 ws     = 10 * 1e-6;          % SLOT WIDTH      : 10 um
 d_gap  = 10 * 1e-6;          % FEED WIDTH      : 10 um
 d_feed = 100 * 1e-6;         % FEED DISTANCE   : 100 um (distance b/n feeds)
-x_lims = [-100 100] * 1e-6;  % DISTANCE LIMITS : -200 um to 200 um
+x_lims = [-100 100] * 1e-6;  % DISTANCE LIMITS : -100 um to 100 um
 dx     = 10 * 1e-6;          % DISTANCE STEP   : 10 um
 % PHOTO-CONDUCTORS
 Vb    = [30; 0];            % BIAS VOLTAGE     : 30 V & 0 V
@@ -246,8 +246,8 @@ legend('location', 'bestoutside');
 ylabel('i [A]');
 xlabel('t [ps]');
 sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
-        num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], 'FontSize', 11, ...
-        'FontWeight', 'bold');
+        num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs, V_{b} = ' num2str(Vb(1)) ...
+        ' V'], 'FontSize', 11, 'FontWeight', 'bold');
 
 %% TOTAL ENERGY
 p = v .* i;
@@ -269,7 +269,7 @@ legend('location', 'bestoutside');
 xlabel('t [ps]');
 ylabel('p [W]');
 title(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
-       num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs']);
+       num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs, V_{b} = ' num2str(Vb(1)) ' V']);
 
 %% VOLTAGE CONTRIBUTIONS
 W_struct = struct('w', w, 'W', W);
@@ -290,7 +290,7 @@ xlim([-0.3 2.5]);
 ylim([-3 15]);
 
 ylabel('v [V]');
-title("$$ \int_{-\infty}^{t}i_{1}(t^{'})z_{11}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+title("$$ \int_{-\infty}^{t}i_{1}(t^{'})h_{11}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
       'FontWeight', 'bold');
 
 subplot(2, 2, 2);
@@ -300,7 +300,7 @@ grid on;
 xlim([-0.3 2.5]);
 ylim([-3 15]);
 
-title("$$ \int_{-\infty}^{t}i_{2}(t^{'})z_{12}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+title("$$ \int_{-\infty}^{t}i_{2}(t^{'})h_{12}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
       'FontWeight', 'bold');
 
 subplot(2, 2, 3);
@@ -312,7 +312,7 @@ ylim([-3 15]);
 
 ylabel('v [V]');
 xlabel('t [ps]');
-title("$$ \int_{-\infty}^{t}i_{1}(t^{'})z_{21}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+title("$$ \int_{-\infty}^{t}i_{1}(t^{'})h_{21}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
       'FontWeight', 'bold');
 
 subplot(2, 2, 4);
@@ -323,12 +323,12 @@ xlim([-0.3 2.5]);
 ylim([-3 15]);
 
 xlabel('t [ps]');
-title("$$ \int_{-\infty}^{t}i_{2}(t^{'})z_{22}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+title("$$ \int_{-\infty}^{t}i_{2}(t^{'})h_{22}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
       'FontWeight', 'bold');
 
 sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
-        num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], 'FontSize', 11, ...
-        'FontWeight', 'bold');
+        num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs, V_{b} = ' num2str(Vb(1)) ...
+        ' V'], 'FontSize', 11, 'FontWeight', 'bold');
 
 %% INSTANTANEOUS POWER COMPONENTS
 p_comp = NaN(2, Nt, 2);
@@ -351,7 +351,7 @@ ylim([-0.5 3]);
 legend('location', 'bestoutside');
 
 ylabel('p [W]');
-title("$$ i_{1}(t)\int_{-\infty}^{t}i_{1}(t^{'})z_{11}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+title("$$ i_{1}(t)\int_{-\infty}^{t}i_{1}(t^{'})h_{11}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
       'FontWeight', 'bold');
 
 subplot(2, 2, 2);
@@ -363,12 +363,12 @@ xlim([-0.3 2.5]);
 ylim([-0.5 3]);
 legend('location', 'bestoutside');
 
-title("$$ i_{1}(t)\int_{-\infty}^{t}i_{2}(t^{'})z_{12}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+title("$$ i_{1}(t)\int_{-\infty}^{t}i_{2}(t^{'})h_{12}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
       'FontWeight', 'bold');
 
 subplot(2, 2, 3);
 plot(tsim * 1e12, p_comp(2, :, 1), '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
-     'DisplayName', ['p_{2}^{ind}, E_{2}^{ind} = ' num2str(round(E_comp(2, 1) * 1e12, 2)) ' pJ']);
+     'DisplayName', ['p_{2}^{ind}, E_{2}^{ind} = ' num2str(round(round(E_comp(2, 1) * 1e12, 3), 2)) ' pJ']);
 
 grid on;
 xlim([-0.3 2.5]);
@@ -377,7 +377,7 @@ legend('location', 'bestoutside');
 
 ylabel('p [W]');
 xlabel('t [ps]');
-title("$$ i_{2}(t)\int_{-\infty}^{t}i_{1}(t^{'})z_{21}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+title("$$ i_{2}(t)\int_{-\infty}^{t}i_{1}(t^{'})h_{21}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
       'FontWeight', 'bold');
 
 subplot(2, 2, 4);
@@ -390,12 +390,12 @@ ylim([-0.5 3]);
 legend('location', 'bestoutside');
 
 xlabel('t [ps]');
-title("$$ i_{2}(t)\int_{-\infty}^{t}i_{2}(t^{'})z_{22}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
+title("$$ i_{2}(t)\int_{-\infty}^{t}i_{2}(t^{'})h_{22}(t-t^{'})dt^{'} $$", 'Interpreter', 'latex', ...
       'FontWeight', 'bold');
 
 sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
-        num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs'], 'FontSize', 11, ...
-        'FontWeight', 'bold');
+        num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs, V_{b} = ' num2str(Vb(1)) ...
+        ' V'], 'FontSize', 11, 'FontWeight', 'bold');
 
 %% WAVE ALONG SLOT
 % vx                   = NaN(Nx, Nt, 2);
