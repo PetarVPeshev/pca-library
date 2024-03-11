@@ -203,6 +203,37 @@ time_step.sigma_t = laser.sigma_t;
 % Voltage and currents
 [v, i] = time_step.simulate();
 
+%% TOTAL ENERGY
+p = v .* i;
+E = sum(p, 2) * dt;
+
+fig = figure('Position', [250 250 950 450]);
+
+plot(tsim * 1e12, -p(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', ...
+     'DisplayName', ['p_{1}, E_{1} = ' num2str(round(-E(1) * 1e12, 2)) ' pJ']);
+hold on;
+plot(tsim * 1e12, -p(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
+     'DisplayName', ['p_{2}, E_{2} = ' num2str(round(-E(2) * 1e12, 2)) ' pJ']);
+
+grid on;
+xlim([-0.3 2.5]);
+ylim([-3 0.5]);
+legend('location', 'bestoutside');
+
+xlabel('t [ps]');
+ylabel('p [W]');
+title(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
+       num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs, V_{b} = ' num2str(Vb(1)) ' V']);
+
+%% VOLTAGE CONTRIBUTIONS
+W_struct = struct('w', w, 'W', W);
+
+v_comp          = NaN(2, Nt, 2);
+v_comp(1, :, 1) = eval_vx(i(1, :), 'h', struct('h', permute(h(1, 1, :), [1 3 2])), 'w', W_struct);
+v_comp(2, :, 1) = eval_vx(i(1, :), 'h', struct('h', permute(h(2, 1, :), [1 3 2])), 'w', W_struct);
+v_comp(1, :, 2) = eval_vx(i(2, :), 'h', struct('h', permute(h(1, 2, :), [1 3 2])), 'w', W_struct);
+v_comp(2, :, 2) = eval_vx(i(2, :), 'h', struct('h', permute(h(2, 2, :), [1 3 2])), 'w', W_struct);
+
 laser_envelope = exp(- 0.5 * ( (tsim - tau_d') / laser.sigma_t) .^ 2) * laser.P0;
 
 figure('Position', [250 250 1050 550]);
@@ -222,9 +253,17 @@ legend('location', 'bestoutside');
 ylabel('P_{L} [kW]');
 
 subplot(3, 1, 2);
-plot(tsim * 1e12, v(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', 'DisplayName', 'v_{1}');
+plot(tsim * 1e12, v(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', ...
+     'DisplayName', 'v_{1}');
 hold on;
-plot(tsim * 1e12, v(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayName', 'v_{2}');
+plot(tsim * 1e12, v(2, :), 'LineWidth', 1.5, 'Color', '#A2142F', ...
+     'DisplayName', 'v_{2}');
+hold on;
+plot(tsim * 1e12, v_comp(2, :, 1), '+--', 'LineWidth', 1.5, 'Color', '#7E2F8E', ...
+     'MarkerIndices', 1 : 500 : Nt, 'DisplayName', 'v_{2}^{s}');
+hold on;
+plot(tsim * 1e12, v_comp(2, :, 2), '*--', 'LineWidth', 1.5, 'Color', '#77AC30', ...
+     'MarkerIndices', 1 : 500 : Nt, 'DisplayName', 'v_{2}^{m}');
 
 grid on;
 xlim([-0.3 2.5]);
@@ -234,9 +273,11 @@ legend('location', 'bestoutside');
 ylabel('v [V]');
 
 subplot(3, 1, 3);
-plot(tsim * 1e12, i(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', 'DisplayName', 'i_{1}');
+plot(tsim * 1e12, i(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', ...
+     'DisplayName', 'i_{1}');
 hold on;
-plot(tsim * 1e12, i(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', 'DisplayName', 'i_{2}');
+plot(tsim * 1e12, i(2, :), 'LineWidth', 1.5, 'Color', '#A2142F', ...
+     'DisplayName', 'i_{2}');
 
 grid on;
 xlim([-0.3 2.5]);
@@ -248,37 +289,6 @@ xlabel('t [ps]');
 sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
         num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs, V_{b} = ' num2str(Vb(1)) ...
         ' V'], 'FontSize', 11, 'FontWeight', 'bold');
-
-%% TOTAL ENERGY
-p = v .* i;
-E = sum(p, 2) * dt;
-
-fig = figure('Position', [250 250 950 450]);
-
-plot(tsim * 1e12, p(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', ...
-     'DisplayName', ['p_{1}, E_{1} = ' num2str(round(E(1) * 1e12, 2)) ' pJ']);
-hold on;
-plot(tsim * 1e12, p(2, :), '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
-     'DisplayName', ['p_{2}, E_{2} = ' num2str(round(E(2) * 1e12, 2)) ' pJ']);
-
-grid on;
-xlim([-0.3 2.5]);
-ylim([-0.5 3]);
-legend('location', 'bestoutside');
-
-xlabel('t [ps]');
-ylabel('p [W]');
-title(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{x} = ' ...
-       num2str(d_feed * 1e6) ' \mum, \delta_{t} = ' num2str(dt * 1e15) ' fs, V_{b} = ' num2str(Vb(1)) ' V']);
-
-%% VOLTAGE CONTRIBUTIONS
-W_struct = struct('w', w, 'W', W);
-
-v_comp          = NaN(2, Nt, 2);
-v_comp(1, :, 1) = eval_vx(i(1, :), 'h', struct('h', permute(h(1, 1, :), [1 3 2])), 'w', W_struct);
-v_comp(2, :, 1) = eval_vx(i(1, :), 'h', struct('h', permute(h(2, 1, :), [1 3 2])), 'w', W_struct);
-v_comp(1, :, 2) = eval_vx(i(2, :), 'h', struct('h', permute(h(1, 2, :), [1 3 2])), 'w', W_struct);
-v_comp(2, :, 2) = eval_vx(i(2, :), 'h', struct('h', permute(h(2, 2, :), [1 3 2])), 'w', W_struct);
 
 figure('Position', [250 250 1050 550]);
 
@@ -342,12 +352,12 @@ E_comp = permute(sum(p_comp, 2) * dt, [1 3 2]);
 figure('Position', [250 250 1250 550]);
 
 subplot(2, 2, 1);
-plot(tsim * 1e12, p_comp(1, :, 1), 'LineWidth', 1.5, 'Color', '#0072BD', ...
-     'DisplayName', ['p_{in}, E_{in} = ' num2str(round(E_comp(1, 1) * 1e12, 2)) ' pJ']);
+plot(tsim * 1e12, -p_comp(1, :, 1), 'LineWidth', 1.5, 'Color', '#0072BD', ...
+     'DisplayName', ['p_{in}, E_{in} = ' num2str(round(-E_comp(1, 1) * 1e12, 2)) ' pJ']);
 
 grid on;
 xlim([-0.3 2.5]);
-ylim([-0.5 3]);
+ylim([-3 0.5]);
 legend('location', 'bestoutside');
 
 ylabel('p [W]');
@@ -355,8 +365,8 @@ title("$$ i_{1}(t)\int_{-\infty}^{t}i_{1}(t^{'})h_{11}(t-t^{'})dt^{'} $$", 'Inte
       'FontWeight', 'bold');
 
 subplot(2, 2, 2);
-plot(tsim * 1e12, p_comp(1, :, 2), '--', 'LineWidth', 1.5, 'Color', '#0072BD', ...
-     'DisplayName', ['p_{1}^{ind}, E_{1}^{ind} = ' num2str(round(E_comp(1, 2) * 1e12, 2)) ' pJ']);
+plot(tsim * 1e12, -p_comp(1, :, 2), '--', 'LineWidth', 1.5, 'Color', '#0072BD', ...
+     'DisplayName', ['p_{1}^{ind}, E_{1}^{ind} = ' num2str(round(-E_comp(1, 2) * 1e12, 2)) ' pJ']);
 
 grid on;
 xlim([-0.3 2.5]);
@@ -367,8 +377,8 @@ title("$$ i_{1}(t)\int_{-\infty}^{t}i_{2}(t^{'})h_{12}(t-t^{'})dt^{'} $$", 'Inte
       'FontWeight', 'bold');
 
 subplot(2, 2, 3);
-plot(tsim * 1e12, p_comp(2, :, 1), '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
-     'DisplayName', ['p_{2}^{ind}, E_{2}^{ind} = ' num2str(round(round(E_comp(2, 1) * 1e12, 3), 2)) ' pJ']);
+plot(tsim * 1e12, -p_comp(2, :, 1), '--', 'LineWidth', 1.5, 'Color', '#A2142F', ...
+     'DisplayName', ['p_{2}^{ind}, E_{2}^{ind} = ' num2str(round(round(-E_comp(2, 1) * 1e12, 3), 2)) ' pJ']);
 
 grid on;
 xlim([-0.3 2.5]);
@@ -381,12 +391,12 @@ title("$$ i_{2}(t)\int_{-\infty}^{t}i_{1}(t^{'})h_{21}(t-t^{'})dt^{'} $$", 'Inte
       'FontWeight', 'bold');
 
 subplot(2, 2, 4);
-plot(tsim * 1e12, p_comp(2, :, 2), 'LineWidth', 1.5, 'Color', '#A2142F', ...
-     'DisplayName', ['p_{m}, E_{m} = ' num2str(round(E_comp(2, 2) * 1e12, 2)) ' pJ']);
+plot(tsim * 1e12, -p_comp(2, :, 2), 'LineWidth', 1.5, 'Color', '#A2142F', ...
+     'DisplayName', ['p_{m}, E_{m} = ' num2str(round(-E_comp(2, 2) * 1e12, 2)) ' pJ']);
 
 grid on;
 xlim([-0.3 2.5]);
-ylim([-0.5 3]);
+ylim([-3 0.5]);
 legend('location', 'bestoutside');
 
 xlabel('t [ps]');
