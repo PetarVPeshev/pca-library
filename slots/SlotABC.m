@@ -45,6 +45,7 @@ classdef (Abstract) SlotABC < handle
             end
 
             c0 = get_phys_const('LightSpeed');
+            Nf = length(f);
             k0 = 2 * pi * f / c0;
 
             % TODO: implement a parfor loop to improve calculation speed

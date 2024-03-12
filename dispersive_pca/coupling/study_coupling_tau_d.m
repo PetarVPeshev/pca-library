@@ -138,7 +138,7 @@ figure('Position', [250 250 1250 550]);
 
 subplot(2, 2, 1);
 plot(tau_d * 1e12, round(E_in * 1e12, 3), 'LineWidth', 1.5, 'Color', '#0000FF', ...
-     'DisplayName', 'E_{in}');
+     'DisplayName', 'E_{L}');
 
 grid on;
 xlim([tau_d(1) tau_d(end)] * 1e12);
@@ -148,17 +148,17 @@ ylabel('E [pJ]');
 title('E_{in}');
 
 subplot(2, 2, 2);
-plot(tau_d * 1e12, E1_ind * 1e12, 'LineWidth', 1.5, 'Color', '#FF0000', ...
+plot(tau_d * 1e12, -E1_ind * 1e12, 'LineWidth', 1.5, 'Color', '#FF0000', ...
      'DisplayName', 'E_{1}^{ind}');
 
 grid on;
 xlim([tau_d(1) tau_d(end)] * 1e12);
-ylim([-0.1 0]);
+ylim([0 0.1]);
 
 title('E_{1}^{ind}');
 
 subplot(2, 2, 3);
-plot(tau_d * 1e12, E2_ind * 1e12, 'LineWidth', 1.5, 'Color', '#00FF00', ...
+plot(tau_d * 1e12, -E2_ind * 1e12, 'LineWidth', 1.5, 'Color', '#00FF00', ...
      'DisplayName', 'E_{2}^{ind}');
 
 grid on;
@@ -217,14 +217,14 @@ xlabel('\tau_{d} [ps]');
 title('E_{rad}');
 
 subplot(2, 2, 4);
-plot(tau_d * 1e12, (E2_ind + E_m) * 1e12, 'LineWidth', 1.5, 'Color', '#A2142F', ...
-     'DisplayName', 'E_{dis}');
+plot(tau_d * 1e12, -(E2_ind + E_m) * 1e12, 'LineWidth', 1.5, 'Color', '#A2142F', ...
+     'DisplayName', 'E_{diss,2}');
 
 grid on;
 xlim([tau_d(1) tau_d(end)] * 1e12);
 
 xlabel('\tau_{d} [ps]');
-title('E_{dis}');
+title('E_{diss,2}');
     
 sgtitle(['@ w_{s} = ' num2str(ws * 1e6) ' \mum, \Delta = ' num2str(d_gap * 1e6) ' \mum, d_{F} = ' ...
         num2str(d_feed * 1e6) ' \mum, V_{b} = ' num2str(Vb(1)) ' V, \delta_{t} = ' num2str(dt * 1e15) ...
@@ -262,7 +262,7 @@ plot(tau_d * 1e12, E_m * 1e12, 'LineWidth', 1.5, 'Color', '#77AC30', ...
      'DisplayName', 'E_{m}');
 hold on;
 plot(tau_d * 1e12, abs(E2_ind + E_m) * 1e12, 'LineWidth', 1.5, 'Color', '#A2142F', ...
-     'DisplayName', 'E_{dis}');
+     'DisplayName', 'E_{diss,2}');
 hold on;
 xline(round(mean(tau_w) * 1e12, 2), 'k--', 'LineWidth', 1.5, ...
      'DisplayName', ['\tau_{w,av} = ' num2str(round(mean(tau_w) * 1e12, 2)) ' ps']);
@@ -272,7 +272,7 @@ xline(tau_d(find((E_m) == max(E_m), 1)) * 1e12, 'g--', 'LineWidth', 1.5, ...
      num2str(round(tau_d(find((E_m) == max(E_m), 1)) * 1e12, 2)) ' ps']);
 hold on;
 xline(tau_d(find((E2_ind + E_m) == min(E2_ind + E_m), 1)) * 1e12, 'r--', 'LineWidth', 1.5, ...
-     'DisplayName', ['max E_{dis}, t = ' ...
+     'DisplayName', ['max E_{diss,2}, t = ' ...
      num2str(round(tau_d(find((E2_ind + E_m) == min(E2_ind + E_m), 1)) * 1e12, 2)) ' ps']);
 
 grid on;
