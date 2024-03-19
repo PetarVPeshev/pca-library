@@ -23,6 +23,6 @@ function varargout = create_time_arrays(dt, time_lim, out_type)
             varargout{2} = t_res;
         end
     else
-        varargout = struct('t_sim', t_sim, 't_res', t_res, 'dt', dt, 'N', N);
+        varargout{1} = struct('t_sim', t_sim, 't_res', t_res, 'dt', dt, 'N', N);
     end
 end

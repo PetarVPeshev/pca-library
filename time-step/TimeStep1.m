@@ -69,7 +69,7 @@ classdef TimeStep1 < handle
             
             obj.Fs     = obj.compute_Fs(obj.t, obj.K, obj.sigma_t, obj.tau_c, obj.tau_d);
             obj.i_impr = obj.compute_i_impr(obj.t, obj.Vb, obj.K, obj.sigma_t, obj.tau_c, obj.tau_d, obj.tau_s);
-            obj.C_impr = obj.compute_C_impr(obj.i_impr, obj.h);
+            obj.C_impr = obj.create_C_impr(obj.i_impr, obj.h);
             obj.alpha  = exp(- obj.dt / obj.tau_c) * exp(- obj.dt / obj.tau_s);
         end
 
@@ -135,49 +135,49 @@ classdef TimeStep1 < handle
             m_max   = length(t);
             n_feeds = length(tau_d);
             dt      = t(2) - t(1);
-            [N, M]  = meshgrid(1 : m_max, 1 : m_max);
 
-            Fs = NaN(n_feeds, m_max);
+            [N, M] = meshgrid(1 : m_max, 1 : m_max);
+            TN     = t(N);
+            TM     = t(M);
+
+            hm = NaN(n_feeds, m_max);
             parfor idx = 1 : n_feeds
-                hm_n = exp(- 0.5 * ((t(N) - tau_d(idx)) / sigma_t) .^ 2) .* exp(- (t(M) - t(N)) / tau_c);
-                Fs(idx, :) = sum(tril(hm_n), 2)';
+                hm_n       = exp(- 0.5 * ((TN - tau_d(idx)) / sigma_t) .^ 2) .* exp(- (TM - TN) / tau_c);
+                hm(idx, :) = sum(tril(hm_n), 2)';
             end
 
-            Fs = (dt ^ 2) * K * Fs;
+            Fs = (dt ^ 2) * K * hm;
         end
 
         function i_impr = compute_i_impr(t, Vb, K, sigma_t, tau_c, tau_d, tau_s)
             %COMPUTE_I_IMPR Summary of this method goes here
             %   Detailed explanation goes here
 
-            m_max  = length(t);
-            dt     = t(2) - t(1);
+            m_max   = length(t);
+            n_feeds = length(tau_d);
+            dt      = t(2) - t(1);
 
-            tau_d1 = tau_d(1);
-            tau_d2 = tau_d(2);
+            [N, M] = meshgrid(1 : m_max, 1 : m_max);
+            TN     = t(N);
+            TM     = t(M);
 
-            i_impr_1 = NaN(1, m_max);
-            i_impr_2 = i_impr_1;
+            i_impr = NaN(n_feeds, m_max);
+            parfor idx = 1 : n_feeds
+                hm_n = exp(- 0.5 * ((TN - tau_d(idx)) / sigma_t) .^ 2) .* exp(- (TM - TN) / tau_c);
+                bm_n = 1 - exp(- (TM - TN) / tau_s);
 
-            parfor m = 1 : m_max
-                pcm_response  = exp(- (t(m) - t(1 : m)) / tau_c);
-                scat_response = (1 - exp(- (t(m) - t(1 : m)) / tau_s));
-
-                i_impr_1(m) = sum(exp(- 0.5 * ( (t(1 : m) - tau_d1) / sigma_t ) .^ 2) ...
-                                  .* pcm_response .* scat_response);
-                i_impr_2(m) = sum(exp(- 0.5 * ( (t(1 : m) - tau_d2) / sigma_t ) .^ 2) ...
-                                  .* pcm_response .* scat_response);
+                i_impr(idx, :) = sum(tril(hm_n .* bm_n), 2)';
             end
 
-            i_impr = dt * tau_s * K * Vb .* [i_impr_1; i_impr_2];
+            i_impr = dt * tau_s * Vb * K * i_impr;
         end
 
-        function C_impr = compute_C_impr(i_impr, h)
+        function C_impr = create_C_impr(i_impr, h)
             %COMPUTE_C_IMPR Summary of this method goes here
             %   Detailed explanation goes here
 
-            m_max  = size(i_impr, 2);
-            C_impr = NaN(2, 2, m_max);
+            [n_feeds, m_max] = size(i_impr);
+            C_impr           = NaN(n_feeds, n_feeds, m_max);
 
             h      = permute(h, [2 3 1]);
             i_impr = repmat(i_impr, [1 1 2]);

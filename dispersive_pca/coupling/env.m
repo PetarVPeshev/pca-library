@@ -2,7 +2,7 @@
 % This scripts adds the library paths to the MATLAB environment path.
 % Run this script before executing code requiring this library.
 
-env_dirs = {'', 'utils', 'slots', 'utils\validation-functions'};
+env_dirs = {'', 'utils', 'slots', 'utils\validation-functions', 'dispersive_pca\coupling'};
 
 add_env(env_dirs);
 clear('env_dirs');
