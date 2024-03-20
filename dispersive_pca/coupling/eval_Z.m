@@ -42,7 +42,7 @@ function Z = create_Z_matrix(f, slot, d_feed, args)
     Nf = length(f);
 
     z_self = slot.compute_zin(f);
-    Z   = NaN(2, 2, Nf, Nd);
+    z_mutu = NaN(2, 2, Nf);
 
     for idx = 1 : Nd
         if d_feed(idx) <= args.MaxNumerical || args.MaxNumerical == 0
