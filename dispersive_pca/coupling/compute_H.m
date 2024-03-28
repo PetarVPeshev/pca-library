@@ -15,4 +15,3 @@ function [H, W] = compute_H(Z, args)
     H = Z .* args.W;
     W = permute(args.W, [1 3 2]);
 end
-

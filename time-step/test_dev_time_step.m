@@ -6,7 +6,10 @@ run('..\dispersive_pca\coupling\env.m');
 run('..\dispersive_pca\coupling\sim_params.m');
 
 %% ANTENNA
-d_feeds = 100 * 1e-6;  % FEED DISTANCE : 100 um (distance b/n feeds)
+d_feeds   = 100 * 1e-6;      % FEED DISTANCE   : 100 um (distance b/n feeds)
+num_feeds = 3;               % NUMBER OF FEEDS : 3
+Vb        = [30 0 0];        % BIAS VOLTAGE    : 30 V @ first feed, other feeds are unbiased
+feedDelay = [0 1 2] * 1e-12; % FEED DELAY TIME : 0 ps, 1 ps, 2 ps
 
 %% FREQUENCY POINTS
 Nf     = 4001;          % FREQUENCY POINTS : 4001
@@ -29,4 +32,20 @@ f    = linspace(f_lims(1), f_lims(2), Nf);
 time = create_time_arrays(dt, t_lims, 'struct');
 
 %% ANTENNA IMPULSE RESPONSE
-Z = eval_Z(f, slot, d_feeds);
+impedMatrix = create_imped_matrix(f, slot, 'DistFeeds', d_feeds, 'NumFeeds', num_feeds);
+[impulResp, weight] = create_impul_resp_matrix(time.t_res, f, impedMatrix);
+
+%% TIME STEP OBJECT
+timeStep = TimeStepByImpressedCurrent(time.t_sim);
+
+timeStep.numFeeds     = num_feeds;
+timeStep.constK       = calculate_K(laser, pcm);
+timeStep.bias         = Vb;
+timeStep.weight       = weight.time_domain;
+timeStep.impulResp    = impulResp.time_domain;
+timeStep.recTime      = pcm.tau_rec;
+timeStep.scatTime     = pcm.tau_s;
+timeStep.feedDelay    = feedDelay;
+timeStep.laserTimeStd = laser.sigma_t;
+
+[voltages, currents] = timeStep.simulate();
