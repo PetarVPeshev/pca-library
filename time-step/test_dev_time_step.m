@@ -32,20 +32,51 @@ f    = linspace(f_lims(1), f_lims(2), Nf);
 time = create_time_arrays(dt, t_lims, 'struct');
 
 %% ANTENNA IMPULSE RESPONSE
-impedMatrix = create_imped_matrix(f, slot, 'DistFeeds', d_feeds, 'NumFeeds', num_feeds);
-[impulResp, weight] = create_impul_resp_matrix(time.t_res, f, impedMatrix);
+% impedMatrix = create_imped_matrix(f, slot, 'DistFeeds', d_feeds, 'NumFeeds', num_feeds);
+% [impulResp, weight] = create_impul_resp_matrix(time.t_res, f, impedMatrix);
+
+%% TEST TIME STEP STATIC FUNCTIONS
+K = calculate_K(laser, pcm);
+% Fs = compute_Fs(t, K, sigma_t, tau_c, tau_d)
+Fs = TimeStep1N.compute_Fs(time.t_sim, K, laser.sigma_t, pcm.tau_rec, feedDelay);
+Fs_check = TimeStep1.compute_Fs(time.t_sim, K, laser.sigma_t, pcm.tau_rec, feedDelay);
+
+figure('Name', 'Photo-Conductor Impulse Response', 'Position', [250 250 950 450]);
+
+plot(time.t_sim * 1e12, Fs(1, :), 'LineWidth', 1.5, 'Color', '#0072BD', ...
+     'DisplayName', 'FEED 1');
+hold on;
+plot(time.t_sim * 1e12, Fs_check(1, :), '--', 'LineWidth', 1.5, 'Color', '#FF00FF', ...
+     'DisplayName', 'FEED 1, test');
+hold on;
+plot(time.t_sim * 1e12, Fs(2, :), 'LineWidth', 1.5, 'Color', '#A2142F', ...
+     'DisplayName', 'FEED 2');
+hold on;
+plot(time.t_sim * 1e12, Fs_check(2, :), '--', 'LineWidth', 1.5, 'Color', '#00FF00', ...
+     'DisplayName', 'FEED 1, test');
+hold on;
+plot(time.t_sim * 1e12, Fs(3, :), 'LineWidth', 1.5, 'Color', '#77AC30', ...
+     'DisplayName', 'FEED 3');
+
+grid on;
+legend('Location', 'bestoutside');
+
+xlabel('t [ps]');
+ylabel('F_{s} [-]');
+title(['@ K = ' num2str(round(K * 1e-27, 2)) '* 10^{27}, \tau_{p} = ' num2str(laser.tau_p * 1e15) ' fs, ' ...
+       '\tau_{c} = ' num2str(pcm.tau_rec * 1e15) ' fs']);
 
 %% TIME STEP OBJECT
-timeStep = TimeStepByImpressedCurrent(time.t_sim);
-
-timeStep.numFeeds     = num_feeds;
-timeStep.constK       = calculate_K(laser, pcm);
-timeStep.bias         = Vb;
-timeStep.weight       = weight.time_domain;
-timeStep.impulResp    = impulResp.time_domain;
-timeStep.recTime      = pcm.tau_rec;
-timeStep.scatTime     = pcm.tau_s;
-timeStep.feedDelay    = feedDelay;
-timeStep.laserTimeStd = laser.sigma_t;
-
-[voltages, currents] = timeStep.simulate();
+% timeStep = TimeStep1N(time.t_sim);
+% 
+% timeStep.numFeeds = num_feeds;
+% timeStep.K        = calculate_K(laser, pcm);
+% timeStep.Vb       = Vb;
+% timeStep.w        = weight.time_domain;
+% timeStep.h        = impulResp.time_domain;
+% timeStep.tau_c    = pcm.tau_rec;
+% timeStep.tau_s    = pcm.tau_s;
+% timeStep.tau_d    = feedDelay;
+% timeStep.sigma_t  = laser.sigma_t;
+% 
+% [v, i] = timeStep.simulate();
